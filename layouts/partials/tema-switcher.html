@@ -1,68 +1,35 @@
-{{/* Determine which tema is active based on the current URL */}}
-{{ $activeTema := "" }}
+{{/* Nav-switcher: elementer konfigureres i hugo.toml under [[params.navSwitcher]]
+     Hvis params.navSwitcher ikke er definert, vises ingenting. */}}
 {{ $url := .RelPermalink }}
-{{ if findRE "behov" $url }}
-  {{ $activeTema = "behov" }}
-{{ else if findRE "pilotering" $url }}
-  {{ $activeTema = "pilotering" }}
-{{ else if findRE "arkitektur" $url }}
-  {{ $activeTema = "arkitektur" }}
-{{ else if findRE "loesning" $url }}
-  {{ $activeTema = "loesning" }}
-{{ else if findRE "informasjonsmodeller" $url }}
-  {{ $activeTema = "informasjonsmodeller" }}
-{{ else if findRE "rammeverk" $url }}
-  {{ $activeTema = "rammeverk" }}
-{{ end }}
+{{ $activeID := "" }}
+{{ $activeTitle := "" }}
+{{ $items := .Site.Params.navSwitcher }}
+
+{{ if $items }}
+  {{ range $items }}
+    {{ if findRE .id $url }}
+      {{ $activeID = .id }}
+      {{ $activeTitle = .title }}
+    {{ end }}
+  {{ end }}
 
 <div class="tema-switcher">
   <div class="tema-switcher-toggle" id="tema-toggle">
-    <span class="tema-label">Tema:</span>
-    <span class="tema-active">{{ if eq $activeTema "behov" }}Behov{{ else if eq $activeTema "pilotering" }}Piloter{{ else if eq $activeTema "arkitektur" }}Arkitektur{{ else if eq $activeTema "loesning" }}Løsninger{{ else if eq $activeTema "informasjonsmodeller" }}Informasjonsmodeller{{ else if eq $activeTema "rammeverk" }}Rammeverk{{ else }}Velg tema{{ end }}</span>
+    <span class="tema-label">{{ with .Site.Params.navSwitcherLabel }}{{ . }}{{ else }}Tema{{ end }}:</span>
+    <span class="tema-active">{{ if $activeTitle }}{{ $activeTitle }}{{ else }}{{ with .Site.Params.navSwitcherPlaceholder }}{{ . }}{{ else }}Velg{{ end }}{{ end }}</span>
     <i class="fa fa-caret-down"></i>
   </div>
   <ul class="tema-switcher-menu" id="tema-menu">
-    <li class="{{ if eq $activeTema "behov" }}active{{ end }}">
-      <a href="{{ "temaer/behov/" | relURL }}">
-        <i class="fa fa-lightbulb-o"></i>
-        <span>Behov</span>
-        {{ if eq $activeTema "behov" }}<i class="fa fa-check"></i>{{ end }}
+    {{ range $items }}
+    {{ $isActive := eq $activeID .id }}
+    <li class="{{ if $isActive }}active{{ end }}">
+      <a href="{{ .url | relURL }}">
+        {{ with .icon }}<i class="fa {{ . }}"></i>{{ end }}
+        <span>{{ .title }}</span>
+        {{ if $isActive }}<i class="fa fa-check"></i>{{ end }}
       </a>
     </li>
-    <li class="{{ if eq $activeTema "pilotering" }}active{{ end }}">
-      <a href="{{ "temaer/pilotering/" | relURL }}">
-        <i class="fa fa-flask"></i>
-        <span>Piloter</span>
-        {{ if eq $activeTema "pilotering" }}<i class="fa fa-check"></i>{{ end }}
-      </a>
-    </li>
-    <li class="{{ if eq $activeTema "arkitektur" }}active{{ end }}">
-      <a href="{{ "temaer/arkitektur/" | relURL }}">
-        <i class="fa fa-sitemap"></i>
-        <span>Arkitektur</span>
-        {{ if eq $activeTema "arkitektur" }}<i class="fa fa-check"></i>{{ end }}
-      </a>
-    </li>
-    <li class="{{ if eq $activeTema "loesning" }}active{{ end }}">
-      <a href="{{ "temaer/loesning/" | relURL }}">
-        <i class="fa fa-cogs"></i>
-        <span>Løsninger</span>
-        {{ if eq $activeTema "loesning" }}<i class="fa fa-check"></i>{{ end }}
-      </a>
-    </li>
-    <li class="{{ if eq $activeTema "rammeverk" }}active{{ end }}">
-      <a href="{{ "temaer/rammeverk/" | relURL }}">
-        <i class="fa fa-cubes"></i>
-        <span>Rammeverk</span>
-        {{ if eq $activeTema "rammeverk" }}<i class="fa fa-check"></i>{{ end }}
-      </a>
-    </li>
-    <li class="{{ if eq $activeTema "informasjonsmodeller" }}active{{ end }}">
-      <a href="{{ "temaer/informasjonsmodeller/" | relURL }}">
-        <i class="fa fa-database"></i>
-        <span>Informasjonsmodeller</span>
-        {{ if eq $activeTema "informasjonsmodeller" }}<i class="fa fa-check"></i>{{ end }}
-      </a>
-    </li>
+    {{ end }}
   </ul>
 </div>
+{{ end }}
