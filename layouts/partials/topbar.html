@@ -5,23 +5,25 @@
   </ul>
 </nav>
 
-<header class="a-header ">
-  <!-- Begin .container -->
+<header class="a-header">
   <div class="container">
     <div class="row">
       <div class="col-12">
-
-        <!-- Begin .a-globalNav -->
-        <nav class="a-globalNav " id="primary-nav">
-          <a href="/" class="a-globalNav-logo">
-            <img src="{{$.Site.BaseURL}}images/adocs-logo-white.svg" alt="Altinn logo" class="a-logo a-modal-top-logo ">
-            <span class="sr-only">Til forsiden</span>
+        <nav class="a-globalNav" id="primary-nav" style="display: flex; align-items: center; justify-content: space-between; position: relative;">
+          <a href="{{ with .Site.GetPage "/" }}{{ .RelPermalink }}{{ end }}" class="a-globalNav-logo" style="display: flex; align-items: center; text-decoration: none;">
+            <img src="{{ "images/SAMT-BU-logo.png" | relURL }}" alt="SAMT-BU logo" class="a-logo a-modal-top-logo" style="height: 40px; width: auto; margin-right: 10px; filter: brightness(0) invert(1);">
+            <span style="color: #fff; font-size: 1.8rem; font-weight: bold;">{{ .Site.Title }}</span>
           </a>
-        </nav> <!-- End .a-globalNav -->
-        
-      </div><!-- End .col -->
-    </div> <!-- End .row -->
-  </div> <!-- End .container -->
+          <span style="position: absolute; left: 42%; top: 50%; transform: translate(-50%, -50%); color: #ff4444; font-size: 1.3rem; font-weight: bold; white-space: nowrap; display: flex; align-items: center;"><span style="font-size: 2.6rem; line-height: 1;">⚒</span><span style="margin-left: 6px;">Nettsted under etablering</span></span>
+          <div class="a-header-actions">
+            {{ partial "tema-switcher.html" . }}
+            {{if not .Site.Params.noSearch}}
+              {{ partial "search.html" . }}
+            {{end}}
+            {{ partial "lang-switcher.html" . }}
+          </div>
+        </nav>
+      </div>
+    </div>
+  </div>
 </header>
-
-

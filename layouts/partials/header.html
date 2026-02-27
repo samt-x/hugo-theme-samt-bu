@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     {{ partial "meta.html" . }}
     {{if .IsHome}}
-    <title>Altinn digitalisering - Utvikling</title>
+    <title>{{ .Site.Title }}</title>
     {{else}}
-    <title>{{ .Title }} :: Altinn digitalisering - Utvikling</title>
+    <title>{{ .Title }} :: {{ .Site.Title }}</title>
     {{end}}
     <link rel="shortcut icon" href="{{"images/favicon.png" | relURL}}" type="image/x-icon" />
     <link href="{{"css/nucleus.css" | relURL}}" rel="stylesheet">
@@ -25,7 +25,7 @@
       <link href="{{(printf "css/theme-%s.css" .) | relURL}}" rel="stylesheet">
     {{end}}
     
-    <script src="{{"js/jquery-2.x.min.js" | relURL}}"></script>
+    <script src="{{"js/jquery-2.x.min.js" | relURL}}" defer></script>
 
     {{ partial "custom-head.html" . }}
 
@@ -39,25 +39,25 @@
   </head>
   <body class="a-page" data-url="{{ .RelPermalink }}">
     {{ partial "topbar.html" . }}
+    <button id="restore-left"  class="sidebar-restore-btn" title="{{ cond (eq .Site.Language.Lang "nb") "Vis navigasjonsmeny" "Show navigation" }}">›</button>
+    <button id="restore-right" class="sidebar-restore-btn" title="{{ cond (eq .Site.Language.Lang "nb") "Vis innholdsfortegnelse" "Show table of contents" }}">‹</button>
 
     {{ if and (.IsHome) (.Params.jumbotron) }}
       {{ partial "jumbotron.html" . }}
     {{end}}
 
-    <div class="container pt-2 pt-md-3 pt-lg-5">
+    <div class="container pt-2 pt-md-2 pt-lg-3">
       <div class="adocs-scrollcontainer">
         <div class="row">
             <div class="col-sm-12">
 
     {{ partial "menu.html" . }}
+        <div class="body-toc-wrapper">
         <section id="body">
           <div id="content" class="adocs-content js-moveChildrenTo">
         <div id="overlay"></div>
         <div class="a-text">
-        {{if not .IsHome}}
           <div id="top-bar">
-            
-
             <div id="breadcrumbs" itemscope="" itemtype="http://data-vocabulary.org/Breadcrumb">
                 <span id="sidebar-toggle-span" class="adocs-sidebarToggle">
                   <a href="#" id="sidebar-toggle" data-sidebar-toggle="">
@@ -66,14 +66,19 @@
                   </a>
                 </span>
                 <span class="links">
+                  <a href="{{ "/" | relURL }}" class="breadcrumb-home"><i class="fa fa-home"></i></a>
+                  <span class="adocs-breadcrumb-divider"> / </span>
+                  {{if .IsHome}}
+                  <span>{{ .Title }}</span>
+                  {{else}}
                   {{if eq .Kind "taxonomy"}}
                     <a href="/docs/tags/">Tags</a> /
                   {{end}}
                   {{ template "breadcrumb" dict "page" . "value" .LinkTitle }}
+                  {{end}}
                 </span>
             </div>
           </div>
-        {{end}}
         {{if .Params.tags }}
           <div id="tags">
             {{ range $index, $tag := .Params.tags }}
@@ -94,16 +99,19 @@
               </h1>
               <p class="a-leadText" id="leadText">{{.Description}}</p>
             {{end}}
+            <div class="page-meta">
+              {{ if not .Lastmod.IsZero }}
+                <span class="page-meta-lastmod">{{T "Last-modified"}}: {{ .Lastmod.Format "2006-01-02 15:04" }}</span>
+              {{ end }}
+              {{ with .Params.status }}
+                <span class="page-meta-status">Status: {{ . }}</span>
+              {{ end }}
+            </div>
           {{end}}
-
-          {{ if and (gt .WordCount 100 ) (.Params.toc) }}
-            <h2>På denne siden:</h2>
-              {{ .TableOfContents }}
-          {{ end }}
 
 {{define "breadcrumb"}}
 {{ if .page.Parent}}
-{{$value := (printf "<a href='%s'>%s</a> <span class='adocs-breadcrumb-divider'> / </span> %s" .page.Parent.URL .page.Parent.LinkTitle .value)}}
+{{$value := (printf "<a href='%s'>%s</a> <span class='adocs-breadcrumb-divider'> / </span> %s" .page.Parent.RelPermalink .page.Parent.LinkTitle .value)}}
 {{ template "breadcrumb" dict "page" .page.Parent "value" $value }} 
 {{else}}
  {{.value|safeHTML}}

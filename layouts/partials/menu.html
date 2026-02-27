@@ -1,25 +1,18 @@
 <nav id="sidebar" class="{{if $.Site.Params.showVisitedLinks }}showVisitedLinks{{end}}">
 
-
-
 {{ $currentNode := . }}
 {{ $showvisitedlinks := .Site.Params.showVisitedLinks }}
 <div class="highlightable">
   <div id="header-wrapper">
-    {{if not .Site.Params.noSearch}}
-        {{ partial "search.html" . }}
-    {{end}}
+  </div>
+  <div class="sidebar-heading-row">
+    <h3 class="sidebar-heading">{{ cond (eq .Site.Language.Lang "nb") "INNHOLD" "CONTENTS" }}</h3>
+    <button id="toggle-left" class="sidebar-toggle-btn" title="{{ cond (eq .Site.Language.Lang "nb") "Skjul/vis navigasjonsmeny" "Show/hide navigation" }}">‹</button>
   </div>
 
-  
     <ul id="docsmenu" class="topics">
-        {{if not .Site.Params.noHomeIcon}}
-            <li data-nav-id="{{"/" | relURL}}" class="dd-item">
-            <a href="{{"/" | relURL}}"><i class="fa fa-fw fa-home"></i></a>
-            </li>
-        {{end}}
-        
-        {{if eq .Site.Params.ordersectionsby "title"}}  
+
+        {{if eq .Site.Params.ordersectionsby "title"}}
           {{range .Site.Home.Sections.ByTitle}}
           {{ template "section-tree-nav" dict "sect" . "currentnode" $currentNode "showvisitedlinks" $showvisitedlinks}}
           {{end}}
@@ -30,16 +23,16 @@
         {{end}}
 
         {{with .Site.Menus.shortcuts}}
-        
+
             {{ range sort . "Weight"}}
                 <li>
                     {{.Pre}}
-                    <a href="{{.URL}}">{{safeHTML .Name}}</a>
+                    <a href="{{.RelPermalink}}">{{safeHTML .Name}}</a>
                     {{.Post}}
                 </li>
             {{end}}
-           
-        
+
+
         {{ if $.Site.Params.showVisitedLinks}}
             <a class="" href="#" data-clear-history-toggle=""><i class="fa  fa-history"></i> {{T "Clear-History"}}</a>
         {{ end }}
@@ -56,13 +49,13 @@
  {{with .sect}}
   {{if .IsSection}}
     {{safeHTML .Params.head}}
-    <li data-nav-id="{{.URL}}" class="dd-item 
+    <li data-nav-id="{{.RelPermalink}}" class="dd-item
         {{if .IsAncestor $currentNode }}parent{{end}}
-        {{if eq .UniqueID $currentNode.UniqueID}}active{{end}}
+        {{if eq .RelPermalink $currentNode.RelPermalink}}active{{end}}
         {{if .Params.alwaysopen}}parent{{end}}
         ">
       <a href="{{ .RelPermalink}}">
-        <span>{{safeHTML .Params.Pre}}{{.LinkTitle}}{{safeHTML .Params.Post}}</span>
+        <span>{{safeHTML .Params.Pre}}{{ partial "status-symbol.html" . }}{{.LinkTitle}}{{safeHTML .Params.Post}}</span>
 
         {{if .Params.titleSup }}
           <sup>{{.Params.titleSup}}</sup>
@@ -88,32 +81,32 @@
           {{ .Scratch.Set "pages" (.Pages | union .Sections) }}
           {{end}}
           {{ $pages := (.Scratch.Get "pages") }}
-          
-        {{if eq .Site.Params.ordersectionsby "title"}}  
+
+        {{if eq .Site.Params.ordersectionsby "title"}}
           {{ range $pages.ByTitle }}
-            {{ if and .Params.hidden (not $.showhidden) }} 
+            {{ if and .Params.hidden (not $.showhidden) }}
             {{else}}
             {{ template "section-tree-nav" dict "sect" . "currentnode" $currentNode "showvisitedlinks" $showvisitedlinks }}
             {{end}}
           {{ end }}
         {{else}}
           {{ range $pages.ByWeight }}
-            {{ if and .Params.hidden (not $.showhidden) }} 
+            {{ if and .Params.hidden (not $.showhidden) }}
             {{else}}
             {{ template "section-tree-nav" dict "sect" . "currentnode" $currentNode "showvisitedlinks" $showvisitedlinks }}
             {{end}}
           {{ end }}
         {{end}}
         </ul>
-      {{ end }}        
+      {{ end }}
     </li>
   {{else}}
     {{ if not .Params.Hidden }}
-      <li data-nav-id="{{.URL}}" class="dd-item
-     {{if eq .UniqueID $currentNode.UniqueID}}active{{end}}
+      <li data-nav-id="{{.RelPermalink}}" class="dd-item
+     {{if eq .RelPermalink $currentNode.RelPermalink}}active{{end}}
       ">
         <a href="{{ .RelPermalink}}">
-        <span>{{safeHTML .Params.Pre}}{{.LinkTitle}}{{safeHTML .Params.Post}}</span> 
+        <span>{{safeHTML .Params.Pre}}{{ partial "status-symbol.html" . }}{{.LinkTitle}}{{safeHTML .Params.Post}}</span>
         {{ if $showvisitedlinks}}<i style="color:grey" class="fa fa-circle-thin read-icon"></i>{{end}}
         </a></li>
      {{ end }}

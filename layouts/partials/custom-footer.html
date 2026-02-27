@@ -1,1 +1,31 @@
-<!-- Partial intended to be overwritten to add javacript -->
+<!-- Language switcher toggle -->
+<script>
+$(document).ready(function() {
+  var toggle = $('#lang-toggle');
+  var menu = $('#lang-menu');
+  toggle.on('click', function(e) {
+    e.stopPropagation();
+    menu.toggleClass('open');
+    $('#tema-menu').removeClass('open');
+  });
+  $(document).on('click', function() {
+    menu.removeClass('open');
+  });
+});
+</script>
+
+<!-- Tema switcher toggle -->
+<script>
+$(document).ready(function() {
+  var toggle = $('#tema-toggle');
+  var menu = $('#tema-menu');
+  toggle.on('click', function(e) {
+    e.stopPropagation();
+    menu.toggleClass('open');
+    $('#lang-menu').removeClass('open');
+  });
+  $(document).on('click', function() {
+    menu.removeClass('open');
+  });
+});
+</script>

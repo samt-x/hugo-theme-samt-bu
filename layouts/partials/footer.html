@@ -11,7 +11,7 @@
                   {{ define "menu-nextprev" }}
                       {{$currentNode := .currentnode }}
                       {{ if ne .menu.Params.hidden true}}
-                          {{if hasPrefix $currentNode.URL .menu.URL }}
+                          {{if hasPrefix $currentNode.RelPermalink .menu.RelPermalink }}
                               {{ $currentNode.Scratch.Set "NextPageOK" "OK" }}
                               {{ $currentNode.Scratch.Set "prevPage" ($currentNode.Scratch.Get "prevPageTmp") }}
                           {{else}}
@@ -38,10 +38,10 @@
           
           
                   {{with ($.Scratch.Get "prevPage")}}
-                      <a class="nav nav-prev" href="{{.URL}}" title="{{.Title}}"> <i class="fa fa-angle-left"></i> Forrige side</a>
+                      <a class="nav nav-prev" href="{{.RelPermalink}}" title="{{.Title}}"> <i class="fa fa-angle-left"></i> Forrige side</a>
                   {{end}}
                   {{with ($.Scratch.Get "nextPage")}}
-                      <a class="nav nav-next" href="{{.URL}}" title="{{.Title}}" style="margin-right: 0px;">Neste side <i class="fa fa-angle-right"></i></a>
+                      <a class="nav nav-next" href="{{.RelPermalink}}" title="{{.Title}}" style="margin-right: 0px;">Neste side <i class="fa fa-angle-right"></i></a>
                   {{end}}
               </div>
 
@@ -63,6 +63,35 @@
 
         </section>
 
+          <aside id="page-toc">
+            {{ $hasToc := strings.Contains .TableOfContents "<li>" }}
+            {{ $children := .Pages }}
+            {{ if .Sections }}
+              {{ $children = $children | union .Sections }}
+            {{ end }}
+            {{ $showChildren := and (not $hasToc) (gt (len $children) 0) }}
+            <div class="toc-heading-row">
+              {{ if $showChildren }}
+                <h3>{{ cond (eq .Page.Language.Lang "nb") "I denne seksjonen" "In this section" }}</h3>
+              {{ else }}
+                <h3 {{ if not $hasToc }}style="color: #bbb;"{{ end }}>{{ cond (eq .Page.Language.Lang "nb") "På denne siden" "On this page" }}</h3>
+              {{ end }}
+              <button id="toggle-right" class="sidebar-toggle-btn" title="{{ cond (eq .Page.Language.Lang "nb") "Skjul/vis" "Show/hide" }}">›</button>
+            </div>
+            {{ if $showChildren }}
+              <ul id="SectionChildren">
+                {{ range $children.ByWeight }}
+                  {{ if not .Params.hidden }}
+                  <li><a href="{{ .RelPermalink }}">{{ partial "status-symbol.html" . }}{{ .LinkTitle }}</a></li>
+                  {{ end }}
+                {{ end }}
+              </ul>
+            {{ else }}
+              {{ .TableOfContents }}
+            {{ end }}
+            <div class="toc-scroll-fade" aria-hidden="true"></div>
+          </aside>
+        </div><!-- End body-toc-wrapper -->
 
         </div> <!-- End col-sm-12 -->
       </div> <!-- End row -->
@@ -84,25 +113,123 @@
     <script src="{{"js/altinndocs.js" | relURL}}"></script>
     <script src="{{"js/altinndocs-learn.js" | relURL}}"></script>
 
-    <script src="{{"js/stickysidebar/rAF.js" | relURL}}"></script>
-    <script src="{{"js/stickysidebar/ResizeSensor.js" | relURL}}"></script>
-    <script src="{{"js/stickysidebar/sticky-sidebar.js" | relURL}}"></script>
-    
-    <script>
-      var a = new StickySidebar('#sidebar', {
-        topSpacing: 20,
-        bottomSpacing: 60,
-        containerSelector: '.adocs-scrollcontainer',
-        innerWrapperSelector: '.sidebar__inner',
-        minWidth: 768
-      });
-    </script>
-
     <link href="{{"mermaid/mermaid.css" | relURL}}" type="text/css" rel="stylesheet"/>
     <script src="{{"mermaid/mermaid.js" | relURL}}"></script>
     <script>mermaid.initialize({startOnLoad:true});</script>
 
     {{ partial "custom-footer.html" . }}
+
+    <script>
+    // Scroll-hint fade for TOC (uses child div) and sidebar (uses ::after pseudo-element)
+    (function() {
+      // TOC: toggle .hidden on the fade div
+      var toc = document.getElementById('page-toc');
+      if (toc) {
+        var tocFade = toc.querySelector('.toc-scroll-fade');
+        if (tocFade) {
+          function updateToc() {
+            var atBottom = toc.scrollHeight - toc.scrollTop - toc.clientHeight < 4;
+            var noOverflow = toc.scrollHeight <= toc.clientHeight;
+            tocFade.classList.toggle('hidden', atBottom || noOverflow);
+          }
+          toc.addEventListener('scroll', updateToc);
+          window.addEventListener('resize', updateToc);
+          updateToc();
+        }
+      }
+      // TOC scroll-spy: bold the active heading link
+      var body = document.getElementById('body');
+      var tocEl = document.getElementById('TableOfContents');
+      if (body && tocEl) {
+        var headings = body.querySelectorAll('h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]');
+        var tocLinks = tocEl.querySelectorAll('a[href^="#"]');
+        function updateActiveToc() {
+          var scrollTop = body.scrollTop;
+          var active = null;
+          headings.forEach(function(h) {
+            if (h.offsetTop - body.offsetTop <= scrollTop + 40) active = h.id;
+          });
+          tocLinks.forEach(function(a) {
+            var isActive = active && a.getAttribute('href') === '#' + active;
+            a.classList.toggle('toc-active', !!isActive);
+          });
+        }
+        body.addEventListener('scroll', updateActiveToc);
+        window.addEventListener('resize', updateActiveToc);
+        updateActiveToc();
+      }
+      // Sidebar collapse toggles
+      (function() {
+        var body = document.body;
+        function setLeft(hidden) {
+          body.classList.toggle('left-hidden', hidden);
+          localStorage.setItem('leftHidden', hidden ? '1' : '0');
+          var tl = document.getElementById('toggle-left');
+          if (tl) tl.textContent = hidden ? '›' : '‹';
+        }
+        function setRight(hidden) {
+          body.classList.toggle('right-hidden', hidden);
+          localStorage.setItem('rightHidden', hidden ? '1' : '0');
+          var tr = document.getElementById('toggle-right');
+          if (tr) tr.textContent = hidden ? '‹' : '›';
+        }
+        // Restore saved state
+        if (localStorage.getItem('leftHidden')  === '1') setLeft(true);
+        if (localStorage.getItem('rightHidden') === '1') setRight(true);
+        // Toggle buttons (inside sidebars)
+        var tl = document.getElementById('toggle-left');
+        if (tl) tl.addEventListener('click', function() { setLeft(!body.classList.contains('left-hidden')); });
+        var tr = document.getElementById('toggle-right');
+        if (tr) tr.addEventListener('click', function() { setRight(!body.classList.contains('right-hidden')); });
+        // Restore buttons (fixed at viewport edge)
+        var rl = document.getElementById('restore-left');
+        if (rl) rl.addEventListener('click', function() { setLeft(false); });
+        var rr = document.getElementById('restore-right');
+        if (rr) rr.addEventListener('click', function() { setRight(false); });
+      })();
+
+      // ── Statussymbol-tooltip: wrap symbol in <span class="status-chip"> ──
+      (function() {
+        var symbolMap = {
+          '\u25CD': 'Ny (0\u0025)',
+          '\u25D4': 'F\u00f8rste utkast (25\u0025)',
+          '\u25D0': 'P\u00e5g\u00e5r (50\u0025)',
+          '\u25D5': 'Til QA (75\u0025)',
+          '\u23FA': 'Godkjent (100\u0025)',
+          '\u2A02': 'Avbrutt'
+        };
+        var sidebar = document.getElementById('sidebar');
+        if (!sidebar) return;
+        sidebar.querySelectorAll('a span').forEach(function(span) {
+          var text = span.textContent;
+          var firstChar = text.charAt(0);
+          if (!symbolMap[firstChar]) return;
+          var chip = document.createElement('span');
+          chip.className = 'status-chip';
+          chip.setAttribute('data-tooltip', symbolMap[firstChar]);
+          chip.textContent = firstChar;
+          var rest = document.createTextNode(text.slice(1));
+          span.textContent = '';
+          span.appendChild(chip);
+          span.appendChild(rest);
+        });
+      })();
+
+      // Sidebar: toggle .fade-hidden on #sidebar itself (controls ::after)
+      var sb = document.getElementById('sidebar');
+      if (sb) {
+        function updateSb() {
+          var atBottom = sb.scrollHeight - sb.scrollTop - sb.clientHeight < 4;
+          var noOverflow = sb.scrollHeight <= sb.clientHeight;
+          sb.classList.toggle('fade-hidden', atBottom || noOverflow);
+        }
+        sb.addEventListener('scroll', updateSb);
+        window.addEventListener('resize', updateSb);
+        new MutationObserver(updateSb).observe(sb, { childList: true, subtree: true, attributes: true });
+        updateSb();
+      }
+    })();
+    </script>
 
   </body>
 </html>

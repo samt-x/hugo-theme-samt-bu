@@ -1,4 +1,683 @@
 <!-- Partial intended to be overwritten to add CSS -->
 <link href="{{"css/altinndigitalisering.css" | relURL}}" rel="stylesheet">
-
 <link href="{{"css/altinn.css" | relURL}}" rel="stylesheet">
+
+<style>
+  /* Language switcher */
+  .lang-switcher {
+    position: relative;
+  }
+  .lang-switcher-toggle {
+    color: #fff;
+    cursor: pointer;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+  }
+  .lang-switcher-toggle:hover {
+    opacity: 0.8;
+  }
+  .lang-switcher-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    list-style: none;
+    margin: 4px 0 0 0;
+    padding: 4px 0;
+    min-width: 150px;
+    z-index: 1000;
+  }
+  .lang-switcher-menu.open {
+    display: block;
+  }
+  .lang-switcher-menu li a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    color: #333;
+    text-decoration: none;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  .lang-switcher-menu li a:hover {
+    background: #f0f0f0;
+  }
+  .lang-switcher-menu li.active a {
+    font-weight: bold;
+  }
+  .lang-switcher-menu li a .fa-check {
+    color: #17c;
+    margin-left: auto;
+  }
+  .lang-flag {
+    height: 1.2em;
+    vertical-align: bottom;
+  }
+
+  /* Tema switcher (component selector) */
+  .tema-switcher {
+    position: relative;
+  }
+  .tema-switcher-toggle {
+    color: #fff;
+    cursor: pointer;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 4px;
+  }
+  .tema-switcher-toggle:hover {
+    background: rgba(255,255,255,0.1);
+  }
+  .tema-label {
+    opacity: 0.7;
+  }
+  .tema-active {
+    font-weight: bold;
+  }
+  .tema-switcher-menu {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: 100%;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    list-style: none;
+    margin: 4px 0 0 0;
+    padding: 4px 0;
+    min-width: 180px;
+    z-index: 1000;
+  }
+  .tema-switcher-menu.open {
+    display: block;
+  }
+  .tema-switcher-menu li a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    color: #333;
+    text-decoration: none;
+    font-size: 14px;
+    white-space: nowrap;
+    border-bottom: none !important;
+  }
+  .tema-switcher-menu li a:hover {
+    background: #f0f0f0;
+  }
+  .tema-switcher-menu li.active a {
+    font-weight: bold;
+  }
+  .tema-switcher-menu li a .fa-check {
+    color: #17c;
+    margin-left: auto;
+  }
+  .tema-switcher-menu li.disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .tema-disabled-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    color: #999;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  /* Header actions: search + language switcher side by side */
+  .a-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  /* Search box in header */
+  .header-search {
+    border-color: rgba(255,255,255,0.5) !important;
+    background: rgba(255,255,255,0.1) !important;
+    width: 220px;
+    height: 32px !important;
+  }
+  .header-search label {
+    color: rgba(255,255,255,0.7);
+  }
+  .header-search input {
+    color: #fff;
+    height: 26px !important;
+  }
+  .header-search input::placeholder {
+    color: rgba(255,255,255,0.5);
+  }
+  .header-search span {
+    color: rgba(255,255,255,0.5);
+  }
+  .header-search span:hover {
+    color: #fff;
+  }
+
+  /* Wider container to use more screen space */
+  @media (min-width: 1200px) {
+    .container {
+      max-width: 95vw;
+      width: 95%;
+    }
+  }
+
+  /* Reduce content font size for better density */
+  .a-text,
+  .a-text p,
+  .a-text li,
+  .a-text ol,
+  .a-text ul:not(.connected-bullets):not(.no-decoration):not(.a-list) li,
+  #body ul,
+  #body ol,
+  #body li {
+    font-size: 16px !important;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+  }
+  /* Tighter spacing for bullet/numbered lists */
+  .a-text ul:not(.connected-bullets):not(.no-decoration):not(.a-list) {
+    margin-top: 4px !important;
+    margin-left: 0 !important;
+    padding-left: 2em !important;
+    list-style: disc !important;
+  }
+  .a-text ul:not(.connected-bullets):not(.no-decoration):not(.a-list) li {
+    padding-left: 0 !important;
+    margin-bottom: 4px !important;
+  }
+  .a-text ul:not(.connected-bullets):not(.no-decoration):not(.a-list) li::before {
+    display: none !important;
+  }
+  /* Nested list levels */
+  .a-text ul:not(.connected-bullets):not(.no-decoration):not(.a-list) ul {
+    list-style: circle !important;
+    padding-left: 2em !important;
+    margin-top: 4px !important;
+  }
+  .a-text ul:not(.connected-bullets):not(.no-decoration):not(.a-list) ul ul {
+    list-style: square !important;
+  }
+  /* Ordered lists */
+  .a-text ol {
+    padding-left: 2em !important;
+    margin-left: 0 !important;
+  }
+  .a-text ol li,
+  #body ul li,
+  #body ol li {
+    margin-bottom: 4px !important;
+  }
+
+  /* ── Sidebar collapse toggle buttons ─────────────────────────────── */
+
+  /* Heading rows: button sits inline with the heading */
+  .sidebar-heading-row,
+  .toc-heading-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .sidebar-heading-row .sidebar-heading,
+  .toc-heading-row h3 {
+    margin: 0 !important;
+    flex: 1;
+  }
+
+  /* Toggle buttons (inside heading rows) */
+  .sidebar-toggle-btn {
+    flex-shrink: 0;
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    width: 20px;
+    height: 20px;
+    line-height: 18px;
+    text-align: center;
+    padding: 0;
+    color: #666;
+    margin-left: 6px;
+  }
+  .sidebar-toggle-btn:hover {
+    background: #ddd;
+    color: #000;
+  }
+
+  /* Collapsed: sidebar collapses to 0 – middle column fills all space */
+  body.left-hidden #sidebar {
+    flex: 0 0 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+  }
+  body.right-hidden #page-toc {
+    flex: 0 0 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+  }
+
+  /* Restore tabs: fixed at viewport edge, visible only when collapsed */
+  .sidebar-restore-btn {
+    display: none;
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 9999;
+    background: #1b4f8a;
+    border: none;
+    cursor: pointer;
+    font-size: 15px;
+    width: 20px;
+    height: 56px;
+    padding: 0;
+    color: #fff;
+    line-height: 1;
+  }
+  .sidebar-restore-btn:hover { background: #1362ae; }
+  #restore-left  { left: 0;  border-radius: 0 5px 5px 0; }
+  #restore-right { right: 0; border-radius: 5px 0 0 5px; }
+  body.left-hidden  #restore-left  { display: block; }
+  body.right-hidden #restore-right { display: block; }
+
+  /* Smooth transitions */
+  @media (min-width: 768px) {
+    #sidebar  { transition: flex-basis 0.2s ease, max-width 0.2s ease; }
+    #page-toc { transition: flex-basis 0.2s ease, max-width 0.2s ease; }
+  }
+
+  /* Children list in right TOC column (section index pages without in-page TOC) */
+  #SectionChildren {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 13px;
+  }
+  #SectionChildren li {
+    margin-bottom: 4px;
+  }
+  #SectionChildren a {
+    color: #000;
+    border-bottom: none !important;
+    text-decoration: none;
+  }
+  #SectionChildren a:hover {
+    text-decoration: underline;
+  }
+
+  /* Section children list (auto-generated on section index pages) */
+  .section-children {
+    margin-top: 1.5rem;
+    border-top: 1px solid #ddd;
+    padding-top: 0.75rem;
+  }
+  .section-children ul {
+    list-style: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .section-children ul li {
+    margin-bottom: 4px !important;
+    font-size: 15px !important;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+  }
+  .section-children ul li::before {
+    content: none !important;
+  }
+  .section-children ul li a {
+    color: #000 !important;
+    border-bottom: none !important;
+    text-decoration: none;
+  }
+  .section-children ul li a:hover {
+    text-decoration: underline;
+  }
+  .section-child-desc {
+    color: #555;
+    font-size: 0.9em;
+  }
+
+  /* Remove blue border-bottom from breadcrumb and TOC links
+     (designsystem.css sets border-bottom: 2px solid #1EAEF7 on all <a>) */
+  #body #breadcrumbs a,
+  #body #breadcrumbs .links a {
+    border-bottom: none;
+    text-decoration: none;
+  }
+  #body #breadcrumbs .links a:hover {
+    border-bottom: 1px solid #000;
+  }
+  /* Home icon in breadcrumbs */
+  .breadcrumb-home {
+    color: #555;
+    font-size: 14px;
+    border-bottom: none !important;
+  }
+  .breadcrumb-home:hover {
+    color: #000;
+  }
+
+  #page-toc a,
+  #page-toc a:hover,
+  #page-toc a:active,
+  #page-toc a:focus {
+    border: none !important;
+    border-bottom: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    padding-bottom: 0 !important;
+  }
+  #page-toc #TableOfContents,
+  #page-toc #TableOfContents ul,
+  #page-toc #TableOfContents li {
+    border: none !important;
+  }
+
+  /* 3-column independent-scroll layout: sidebar | content | TOC
+     Each column scrolls on its own; the page itself does NOT scroll.
+     Header and footer stay fixed at top/bottom of the viewport. */
+  @media (min-width: 768px) {
+    /* Lock the viewport — no page-level scroll */
+    html, body.a-page {
+      height: 100%;
+      overflow: hidden;
+    }
+    body.a-page {
+      display: flex;
+      flex-direction: column;
+    }
+    /* Header / footer keep their natural size */
+    .a-jumpnav, .a-header, .a-footer { flex-shrink: 0; }
+
+    /* Reduce header height by ~1/3 (100px → ~66px), keep content centered */
+    .a-header {
+      height: auto !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+    }
+    .a-header .container,
+    .a-header .row,
+    .a-header .col-12 {
+      height: 100%;
+    }
+    .a-header #primary-nav {
+      padding: 13px 0;           /* ~66px total with 40px logo */
+    }
+
+    /* Container between header and footer fills remaining space */
+    body.a-page > .container {
+      flex: 1;
+      min-height: 0;           /* allow flex child to shrink below content */
+      display: flex;
+      flex-direction: column;
+      padding-top: 0.5rem !important;  /* halve gray gap (was pt-md-3 = 1rem) */
+    }
+    @media (min-width: 992px) {
+      body.a-page > .container {
+        padding-top: 1.5rem !important; /* halve gray gap (was pt-lg-5 = 3rem) */
+      }
+    }
+    .adocs-scrollcontainer {
+      flex: 1;
+      min-height: 0;
+    }
+    .adocs-scrollcontainer .row {
+      height: 100%;
+    }
+    .adocs-scrollcontainer .row > .col-sm-12 {
+      display: flex;
+      align-items: stretch;    /* columns fill full height */
+      height: 100%;
+    }
+
+    /* --- Left column: sidebar --- */
+    #sidebar {
+      float: none !important;
+      flex: 0 0 20%;
+      min-width: 180px;
+      max-width: 260px;
+      font-size: 15px;
+      padding-top: 12px;               /* vertical align with TOC heading */
+      overflow-y: auto;
+      scrollbar-width: none;             /* Firefox */
+    }
+    #sidebar::-webkit-scrollbar {
+      display: none;                      /* Chrome/Safari */
+    }
+    /* Override theme.css .highlightable so #sidebar owns the scroll */
+    #sidebar .highlightable {
+      overflow: visible;
+      height: auto;
+    }
+
+    /* --- Middle + right wrapper --- */
+    .body-toc-wrapper {
+      flex: 1;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      align-items: stretch;
+      margin-left: 16px;
+    }
+
+    /* --- Middle column: main content --- */
+    .body-toc-wrapper #body {
+      flex: 1;
+      min-width: 0;
+      overflow-y: auto;
+      margin-left: 0 !important;
+    }
+
+    /* --- Right column: table of contents --- */
+    #page-toc {
+      flex: 0 0 18%;
+      min-width: 150px;
+      max-width: 240px;
+      overflow-y: auto;
+      scrollbar-width: none;             /* Firefox */
+    }
+    #page-toc::-webkit-scrollbar {
+      display: none;                      /* Chrome/Safari */
+    }
+  }
+
+  /* Tighter spacing for sidebar menu items */
+  #sidebar ul li a {
+    padding: 2px 9px !important;
+  }
+  #sidebar ul ul li > a {
+    padding: 2px 6px !important;
+  }
+
+  /* Left sidebar heading — aligned with menu items and TOC heading */
+  #sidebar .sidebar-heading {
+    font-size: 14px;
+    font-weight: bold;
+    margin-top: 0;
+    margin-bottom: 2px;           /* symmetric with padding above first menu item */
+    color: #333;
+    padding-left: 9px;            /* flush with menu-item text */
+  }
+  /* Override theme's 36px margin-top so heading↔line↔menu spacing is tight */
+  #sidebar ul.topics {
+    margin-top: 0 !important;
+  }
+
+  /* Right-side Table of Contents (visual styling only; layout in @media above) */
+  #page-toc {
+    padding: 12px 16px 0;
+    margin-left: 16px;
+    font-size: 13px;
+    border-left: 2px solid #e0e0e0;
+  }
+  /* Scroll-hint: gradient fade at bottom when more content below */
+  .toc-scroll-fade {
+    pointer-events: none;
+    position: sticky;
+    bottom: 0;
+    display: block;
+    height: 36px;
+    margin: 0 -16px;           /* stretch to fill #page-toc padding */
+    padding: 0 16px;
+    background: linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.85) 60%, rgba(255,255,255,1) 100%);
+    transition: opacity 0.3s;
+  }
+  .toc-scroll-fade.hidden {
+    opacity: 0;
+  }
+  /* Sidebar fade: pseudo-element = direct child of scroll container */
+  #sidebar::after {
+    content: '';
+    pointer-events: none;
+    position: sticky;
+    bottom: 0;
+    display: block;
+    height: 36px;
+    margin-top: -36px;
+    background: linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.85) 60%, rgba(255,255,255,1) 100%);
+    transition: opacity 0.3s;
+    z-index: 1;
+  }
+  #sidebar.fade-hidden::after {
+    opacity: 0;
+  }
+  #page-toc h3 {
+    font-size: 14px;
+    font-weight: bold;
+    margin-top: 0;
+    margin-bottom: 8px;
+    color: #333;
+  }
+  #page-toc #TableOfContents {
+    font-size: 13px;
+    padding: 0;
+    overflow: visible !important;
+    max-height: none !important;
+  }
+  #page-toc #TableOfContents ul {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+  }
+  #page-toc #TableOfContents ul ul {
+    padding-left: 12px;
+    margin-bottom: 0;
+  }
+  #page-toc #TableOfContents li {
+    margin-bottom: 4px;
+    padding-left: 0 !important;
+  }
+  /* Override theme bullets (content: '•') on nested items */
+  #page-toc #TableOfContents li::before {
+    content: none !important;
+    display: none !important;
+  }
+  #page-toc #TableOfContents a {
+    color: #000;
+    text-decoration: none !important;
+    font-weight: normal !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+  }
+  #page-toc #TableOfContents a.toc-active {
+    font-weight: bold !important;
+  }
+  #page-toc #TableOfContents a:hover,
+  #page-toc #TableOfContents a:active,
+  #page-toc #TableOfContents a:focus {
+    color: #000;
+    text-decoration: underline !important;
+    border: none !important;
+    border-bottom: none !important;
+    padding-bottom: 0 !important;
+  }
+  /* Page metadata row below title (extensible with status etc.) */
+  .page-meta {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 16px;
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  /* Edit-on-GitHub link at bottom */
+  #top-github-link {
+    text-align: right;
+    font-size: 13px;
+    margin-top: 24px;
+    padding-top: 12px;
+    border-top: 1px solid #e0e0e0;
+  }
+  #top-github-link a {
+    color: #1EAEF7;
+    text-decoration: none;
+    border-bottom: none !important;
+  }
+  #top-github-link a:hover {
+    border-bottom: 1px solid #1EAEF7 !important;
+  }
+
+  @media (max-width: 767px) {
+    .body-toc-wrapper {
+      display: block;
+    }
+    #page-toc {
+      display: none;
+    }
+  }
+  @media (min-width: 768px) and (max-width: 1100px) {
+    #page-toc {
+      display: none;
+    }
+  }
+
+  /* ── Statussymbol-tooltip i sidebar ── */
+  .status-chip {
+    position: relative;
+    cursor: help;
+    display: inline-block;
+  }
+  .status-chip::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: calc(100% + 6px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: #1b4f8a;
+    color: #fff;
+    padding: 3px 9px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+    z-index: 9999;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  }
+  .status-chip:hover::after {
+    opacity: 1;
+  }
+</style>
