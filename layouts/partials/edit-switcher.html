@@ -30,7 +30,7 @@
     <span class="tema-active">{{ i18n "editSwitcherLabel" | default (cond (eq $lang "en") "Edit" "Endre") }}</span>
     <i class="fa fa-caret-down"></i>
   </div>
-  <ul class="tema-switcher-menu" id="edit-menu">
+  <ul class="tema-switcher-menu align-right" id="edit-menu">
     {{ if and .File (not $isModule) (ne $entryPath "") }}
     <li>
       <a href="{{ $pageEditURL }}">
