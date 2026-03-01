@@ -1,10 +1,16 @@
 {{- $symbols := dict
-    "Ny" "◍"
-    "Tidlig utkast"        "◔"
-    "Pågår"                "◐"
-    "Til QA"               "◕"
-    "Godkjent"             "⏺"
-    "Avbrutt"              "⨂"
+    "Ny"            "◍"
+    "New"           "◍"
+    "Tidlig utkast" "◔"
+    "Early draft"   "◔"
+    "Pågår"         "◐"
+    "In progress"   "◐"
+    "Til QA"        "◕"
+    "For QA"        "◕"
+    "Godkjent"      "⏺"
+    "Approved"      "⏺"
+    "Avbrutt"       "⨂"
+    "Cancelled"     "⨂"
 -}}
 {{- $symbol := index $symbols (default "" .Params.status) -}}
 {{- if $symbol -}}{{ $symbol }} {{- end -}}
