@@ -23,7 +23,7 @@
 {{ $overviewPath := cond (eq $lang "en") "edit/en/" "edit/" }}
 {{ $portalURL := $portalPath | relURL }}
 {{ $overviewURL := $overviewPath | relURL }}
-{{ $pageEditURL := printf "%s#/collections/%s/entries/%s" $portalURL $collection $entryPath }}
+{{ $pageEditURL := printf "%s#/collections/%s/entries/%s/_index" $portalURL $collection $entryPath }}
 
 <div class="tema-switcher">
   <div class="tema-switcher-toggle" id="edit-toggle">
