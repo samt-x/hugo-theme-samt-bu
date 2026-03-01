@@ -35,21 +35,21 @@
     <li>
       <a href="{{ $pageEditURL }}">
         <i class="fa fa-file-text-o"></i>
-        <span>{{ i18n "editSwitcherPage" | default (cond (eq $lang "en") "Page" "Side") }}</span>
+        <span>{{ i18n "editSwitcherPage" | default (cond (eq $lang "en") "This page" "Denne siden") }}</span>
       </a>
     </li>
     {{ else }}
     <li class="disabled">
       <span class="tema-disabled-item">
         <i class="fa fa-file-text-o"></i>
-        {{ i18n "editSwitcherPage" | default (cond (eq $lang "en") "Page" "Side") }}
+        {{ i18n "editSwitcherPage" | default (cond (eq $lang "en") "This page" "Denne siden") }}
       </span>
     </li>
     {{ end }}
     <li>
       <a href="{{ $overviewURL }}">
         <i class="fa fa-list"></i>
-        <span>{{ i18n "editSwitcherOther" | default (cond (eq $lang "en") "Other" "Annet") }}</span>
+        <span>{{ i18n "editSwitcherOther" | default (cond (eq $lang "en") "Other options" "Andre valg") }}</span>
       </a>
     </li>
   </ul>
