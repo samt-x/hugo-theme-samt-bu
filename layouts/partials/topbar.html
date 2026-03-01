@@ -20,11 +20,7 @@
               {{ partial "search.html" . }}
             {{end}}
             {{ partial "lang-switcher.html" . }}
-            {{ if eq .Site.Language.Lang "en" }}
-            <a href="{{ "edit/en/" | relURL }}" style="color: #fff; font-size: 0.85rem; font-weight: 500; text-decoration: none; border: 1px solid rgba(255,255,255,0.6); border-radius: 4px; padding: 5px 12px; white-space: nowrap; margin-left: 8px; opacity: 0.9; transition: opacity 0.15s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.9'">Edit</a>
-            {{ else }}
-            <a href="{{ "edit/" | relURL }}" style="color: #fff; font-size: 0.85rem; font-weight: 500; text-decoration: none; border: 1px solid rgba(255,255,255,0.6); border-radius: 4px; padding: 5px 12px; white-space: nowrap; margin-left: 8px; opacity: 0.9; transition: opacity 0.15s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.9'">Rediger</a>
-            {{ end }}
+            {{ partial "edit-switcher.html" . }}
           </div>
         </nav>
       </div>

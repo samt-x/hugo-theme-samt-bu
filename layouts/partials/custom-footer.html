@@ -7,6 +7,7 @@ $(document).ready(function() {
     e.stopPropagation();
     menu.toggleClass('open');
     $('#tema-menu').removeClass('open');
+    $('#edit-menu').removeClass('open');
   });
   $(document).on('click', function() {
     menu.removeClass('open');
@@ -23,6 +24,24 @@ $(document).ready(function() {
     e.stopPropagation();
     menu.toggleClass('open');
     $('#lang-menu').removeClass('open');
+    $('#edit-menu').removeClass('open');
+  });
+  $(document).on('click', function() {
+    menu.removeClass('open');
+  });
+});
+</script>
+
+<!-- Edit switcher toggle -->
+<script>
+$(document).ready(function() {
+  var toggle = $('#edit-toggle');
+  var menu = $('#edit-menu');
+  toggle.on('click', function(e) {
+    e.stopPropagation();
+    menu.toggleClass('open');
+    $('#lang-menu').removeClass('open');
+    $('#tema-menu').removeClass('open');
   });
   $(document).on('click', function() {
     menu.removeClass('open');

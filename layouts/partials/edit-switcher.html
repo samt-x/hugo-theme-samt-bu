@@ -1,0 +1,56 @@
+{{/* Edit switcher: dropdown for å redigere gjeldende side i Decap CMS eller gå til CMS-oversikt.
+     «Side»/«Page» → deep-link til gjeldende side.
+     «Annet»/«Other» → CMS-oversikt.
+     Sider fra Hugo Modules (teams/, utkast/) får «Side» deaktivert (fase 1). */}}
+{{ $lang := .Site.Language.Lang }}
+{{ $isModule := false }}
+{{ $entryPath := "" }}
+{{ $collection := "docs" }}
+
+{{ if .File }}
+  {{/* path.Dir normaliserer Windows-backslash til forward slash */}}
+  {{ $dir := path.Dir .File.Path }}
+  {{/* "utkast" er hel-modul (ingen lokal rot), sjekk eksakt match OG substier.
+       "teams" er lokal seksjonshode; bare teams/team-architecture/* er modul. */}}
+  {{ $isModule = or (hasPrefix $dir "teams/") (eq $dir "utkast") (hasPrefix $dir "utkast/") }}
+  {{ if not $isModule }}
+    {{ $entryPath = strings.TrimPrefix "." $dir }}
+    {{ $entryPath = strings.TrimPrefix "/" $entryPath }}
+  {{ end }}
+{{ end }}
+
+{{ $portalPath := cond (eq $lang "en") "edit/docs-en/" "edit/docs-nb/" }}
+{{ $overviewPath := cond (eq $lang "en") "edit/en/" "edit/" }}
+{{ $portalURL := $portalPath | relURL }}
+{{ $overviewURL := $overviewPath | relURL }}
+{{ $pageEditURL := printf "%s#/collections/%s/entries/%s" $portalURL $collection $entryPath }}
+
+<div class="tema-switcher">
+  <div class="tema-switcher-toggle" id="edit-toggle">
+    <span class="tema-active">{{ i18n "editSwitcherLabel" | default (cond (eq $lang "en") "Edit" "Endre") }}</span>
+    <i class="fa fa-caret-down"></i>
+  </div>
+  <ul class="tema-switcher-menu" id="edit-menu">
+    {{ if and .File (not $isModule) (ne $entryPath "") }}
+    <li>
+      <a href="{{ $pageEditURL }}">
+        <i class="fa fa-file-text-o"></i>
+        <span>{{ i18n "editSwitcherPage" | default (cond (eq $lang "en") "Page" "Side") }}</span>
+      </a>
+    </li>
+    {{ else }}
+    <li class="disabled">
+      <span class="tema-disabled-item">
+        <i class="fa fa-file-text-o"></i>
+        {{ i18n "editSwitcherPage" | default (cond (eq $lang "en") "Page" "Side") }}
+      </span>
+    </li>
+    {{ end }}
+    <li>
+      <a href="{{ $overviewURL }}">
+        <i class="fa fa-list"></i>
+        <span>{{ i18n "editSwitcherOther" | default (cond (eq $lang "en") "Other" "Annet") }}</span>
+      </a>
+    </li>
+  </ul>
+</div>
