@@ -1,50 +1,59 @@
 <!-- Language switcher toggle -->
 <script>
-$(document).ready(function() {
-  var toggle = $('#lang-toggle');
-  var menu = $('#lang-menu');
-  toggle.on('click', function(e) {
+(function() {
+  var toggle = document.getElementById('lang-toggle');
+  var menu = document.getElementById('lang-menu');
+  if (!toggle || !menu) return;
+  toggle.addEventListener('click', function(e) {
     e.stopPropagation();
-    menu.toggleClass('open');
-    $('#tema-menu').removeClass('open');
-    $('#edit-menu').removeClass('open');
+    menu.classList.toggle('open');
+    var temaMenu = document.getElementById('tema-menu');
+    var editMenu = document.getElementById('edit-menu');
+    if (temaMenu) temaMenu.classList.remove('open');
+    if (editMenu) editMenu.classList.remove('open');
   });
-  $(document).on('click', function() {
-    menu.removeClass('open');
+  document.addEventListener('click', function() {
+    menu.classList.remove('open');
   });
-});
+})();
 </script>
 
 <!-- Tema switcher toggle -->
 <script>
-$(document).ready(function() {
-  var toggle = $('#tema-toggle');
-  var menu = $('#tema-menu');
-  toggle.on('click', function(e) {
+(function() {
+  var toggle = document.getElementById('tema-toggle');
+  var menu = document.getElementById('tema-menu');
+  if (!toggle || !menu) return;
+  toggle.addEventListener('click', function(e) {
     e.stopPropagation();
-    menu.toggleClass('open');
-    $('#lang-menu').removeClass('open');
-    $('#edit-menu').removeClass('open');
+    menu.classList.toggle('open');
+    var langMenu = document.getElementById('lang-menu');
+    var editMenu = document.getElementById('edit-menu');
+    if (langMenu) langMenu.classList.remove('open');
+    if (editMenu) editMenu.classList.remove('open');
   });
-  $(document).on('click', function() {
-    menu.removeClass('open');
+  document.addEventListener('click', function() {
+    menu.classList.remove('open');
   });
-});
+})();
 </script>
 
 <!-- Edit switcher toggle -->
 <script>
-$(document).ready(function() {
-  var toggle = $('#edit-toggle');
-  var menu = $('#edit-menu');
-  toggle.on('click', function(e) {
+(function() {
+  var toggle = document.getElementById('edit-toggle');
+  var menu = document.getElementById('edit-menu');
+  if (!toggle || !menu) return;
+  toggle.addEventListener('click', function(e) {
     e.stopPropagation();
-    menu.toggleClass('open');
-    $('#lang-menu').removeClass('open');
-    $('#tema-menu').removeClass('open');
+    menu.classList.toggle('open');
+    var langMenu = document.getElementById('lang-menu');
+    var temaMenu = document.getElementById('tema-menu');
+    if (langMenu) langMenu.classList.remove('open');
+    if (temaMenu) temaMenu.classList.remove('open');
   });
-  $(document).on('click', function() {
-    menu.removeClass('open');
+  document.addEventListener('click', function() {
+    menu.classList.remove('open');
   });
-});
+})();
 </script>
