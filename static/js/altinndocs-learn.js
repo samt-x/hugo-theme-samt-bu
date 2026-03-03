@@ -81,10 +81,13 @@ $(window).resize(function() {
 
 
 jQuery(document).ready(function() {
-    jQuery('#sidebar .category-icon').on('click', function() {
-        $( this ).toggleClass("fa-sort-down fa-caret-right") ;
-        $( this ).parent().parent().children('ul').toggle() ;
-        return false;
+    jQuery('#sidebar .dd-item > a').on('click', function() {
+        var ul = $(this).next('ul');
+        if (ul.length) {
+            $(this).find('.category-icon').toggleClass('fa-sort-down fa-caret-right');
+            ul.toggle();
+            return false;
+        }
     });
 
     var sidebarStatus = searchStatus = 'open';
