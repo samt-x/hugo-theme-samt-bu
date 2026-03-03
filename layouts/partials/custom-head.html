@@ -471,8 +471,16 @@
     }
     /* Override theme.css .highlightable so #sidebar owns the scroll */
     #sidebar .highlightable {
-      overflow: visible;
-      height: auto;
+      overflow: visible !important;
+      height: auto !important;
+    }
+    /* Hide scrollbar on both #sidebar and .highlightable (whichever scrolls) */
+    #sidebar .highlightable {
+      scrollbar-width: none !important;
+    }
+    #sidebar .highlightable::-webkit-scrollbar {
+      display: none !important;
+      width: 0 !important;
     }
 
     /* --- Middle + right wrapper --- */
