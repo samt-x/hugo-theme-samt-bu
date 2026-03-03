@@ -463,10 +463,11 @@
       font-size: 15px;
       padding-top: 12px;               /* vertical align with TOC heading */
       overflow-y: auto;
-      scrollbar-width: none;             /* Firefox */
+      scrollbar-width: none !important; /* Firefox */
     }
     #sidebar::-webkit-scrollbar {
-      display: none;                      /* Chrome/Safari */
+      display: none !important;         /* Chrome/Safari */
+      width: 0 !important;
     }
     /* Override theme.css .highlightable so #sidebar owns the scroll */
     #sidebar .highlightable {
@@ -490,6 +491,11 @@
       min-width: 0;
       overflow-y: auto;
       margin-left: 0 !important;
+      scrollbar-width: none !important; /* Firefox */
+    }
+    .body-toc-wrapper #body::-webkit-scrollbar {
+      display: none !important;         /* Chrome/Safari */
+      width: 0 !important;
     }
 
     /* --- Right column: table of contents --- */
