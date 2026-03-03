@@ -215,19 +215,31 @@
         });
       })();
 
-      // Sidebar: toggle .fade-hidden on #sidebar itself (controls ::after)
+      // Sidebar: toggle .hidden on .sidebar-scroll-fade (same technique as TOC)
       var sb = document.getElementById('sidebar');
-      if (sb) {
+      var sbFade = sb ? sb.querySelector('.sidebar-scroll-fade') : null;
+      if (sb && sbFade) {
         function updateSb() {
           var atBottom = sb.scrollHeight - sb.scrollTop - sb.clientHeight < 4;
           var noOverflow = sb.scrollHeight <= sb.clientHeight;
-          sb.classList.toggle('fade-hidden', atBottom || noOverflow);
+          sbFade.classList.toggle('hidden', atBottom || noOverflow);
         }
         sb.addEventListener('scroll', updateSb);
         window.addEventListener('resize', updateSb);
         new MutationObserver(updateSb).observe(sb, { childList: true, subtree: true, attributes: true });
         updateSb();
       }
+
+      // Strip any inline overflow set by Altinn scripts on #sidebar children
+      requestAnimationFrame(function() {
+        var hl = document.querySelector('#sidebar .highlightable');
+        if (hl) {
+          hl.style.removeProperty('overflow');
+          hl.style.removeProperty('overflow-y');
+          hl.style.removeProperty('overflow-x');
+          hl.style.removeProperty('height');
+        }
+      });
     })();
     </script>
 

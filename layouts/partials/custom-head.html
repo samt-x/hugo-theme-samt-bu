@@ -463,15 +463,18 @@
       font-size: 15px;
       padding-top: 12px;               /* vertical align with TOC heading */
       overflow-y: auto;
-      scrollbar-width: none;             /* Firefox */
+      scrollbar-width: none !important; /* Firefox */
     }
-    #sidebar::-webkit-scrollbar {
-      display: none;                      /* Chrome/Safari */
+    #sidebar::-webkit-scrollbar,
+    #sidebar *::-webkit-scrollbar {
+      display: none !important;         /* Chrome/Safari: hide on sidebar and all children */
+      width: 0 !important;
     }
     /* Override theme.css .highlightable so #sidebar owns the scroll */
     #sidebar .highlightable {
-      overflow: visible;
-      height: auto;
+      overflow: visible !important;
+      height: auto !important;
+      scrollbar-width: none !important;
     }
 
     /* --- Middle + right wrapper --- */
@@ -549,20 +552,17 @@
   .toc-scroll-fade.hidden {
     opacity: 0;
   }
-  /* Sidebar fade: pseudo-element = direct child of scroll container */
-  #sidebar::after {
-    content: '';
+  /* Sidebar fade: real element at end of .highlightable (same technique as TOC) */
+  .sidebar-scroll-fade {
     pointer-events: none;
     position: sticky;
     bottom: 0;
     display: block;
     height: 36px;
-    margin-top: -36px;
     background: linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.85) 60%, rgba(255,255,255,1) 100%);
     transition: opacity 0.3s;
-    z-index: 1;
   }
-  #sidebar.fade-hidden::after {
+  .sidebar-scroll-fade.hidden {
     opacity: 0;
   }
   #page-toc h3 {
@@ -626,13 +626,21 @@
     flex-wrap: wrap;
   }
 
-  /* Edit-on-GitHub link at bottom */
+  /* Edit-on-GitHub link at bottom — reduce gap from content */
+  .adocs-content {
+    padding-bottom: 12px !important;
+    margin-bottom: 4px !important;
+  }
   #top-github-link {
     text-align: right;
     font-size: 13px;
-    margin-top: 24px;
-    padding-top: 12px;
+    margin-top: 8px;
+    padding-top: 8px;
     border-top: 1px solid #e0e0e0;
+    /* Override theme.css which uses top:50%/translateY(-50%) to center */
+    position: static !important;
+    top: auto !important;
+    transform: none !important;
   }
   #top-github-link a {
     color: #1EAEF7;
