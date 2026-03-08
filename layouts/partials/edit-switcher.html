@@ -9,6 +9,8 @@
 {{ $collection := "docs" }}
 {{ $portalPath := cond (eq $lang "en") "edit/docs-en/" "edit/docs-nb/" }}
 {{ $overviewPath := cond (eq $lang "en") "edit/en/" "edit/" }}
+{{ $githubRepo := "samt-bu-docs" }}
+{{ $addChildURL := "" }}
 
 {{ if .File }}
   {{/* path.Dir normaliserer Windows-backslash til forward slash */}}
@@ -23,6 +25,7 @@
     {{ $portalPath = cond (eq $lang "en") "edit/arkitektur-en/" "edit/arkitektur-nb/" }}
     {{ $rel = strings.TrimPrefix "teams/team-architecture" $dir }}
     {{ $rel = strings.TrimPrefix "/" $rel }}
+    {{ $githubRepo = "team-architecture" }}
 
   {{ else if or (eq $dir "utkast") (hasPrefix $dir "utkast/") }}
     {{/* samt-bu-drafts modul */}}
@@ -31,6 +34,7 @@
     {{ $portalPath = cond (eq $lang "en") "edit/utkast-en/" "edit/utkast-nb/" }}
     {{ $rel = strings.TrimPrefix "utkast" $dir }}
     {{ $rel = strings.TrimPrefix "/" $rel }}
+    {{ $githubRepo = "samt-bu-drafts" }}
 
   {{ else if or (eq $dir "loesninger/cms-loesninger/samt-bu-docs") (hasPrefix $dir "loesninger/cms-loesninger/samt-bu-docs/") }}
     {{/* solution-samt-bu-docs modul */}}
@@ -39,6 +43,7 @@
     {{ $portalPath = cond (eq $lang "en") "edit/loesninger-en/" "edit/loesninger-nb/" }}
     {{ $rel = strings.TrimPrefix "loesninger/cms-loesninger/samt-bu-docs" $dir }}
     {{ $rel = strings.TrimPrefix "/" $rel }}
+    {{ $githubRepo = "solution-samt-bu-docs" }}
 
   {{ else }}
     {{/* Lokal docs-side */}}
@@ -54,6 +59,10 @@
   {{ else }}
     {{ $entrySlug = printf "%s/_index" $rel }}
   {{ end }}
+
+  {{/* GitHub «create file»-URL for å opprette nytt underkapittel */}}
+  {{ $contentPath := cond (eq $rel "") "content/" (printf "content/%s/" $rel) }}
+  {{ $addChildURL = printf "https://github.com/SAMT-X/%s/new/main/%s" $githubRepo $contentPath }}
 {{ end }}
 
 {{ $portalURL := $portalPath | relURL }}
@@ -79,6 +88,14 @@
         <i class="fa fa-file-text-o"></i>
         {{ i18n "editSwitcherPage" | default (cond (eq $lang "en") "This page" "Denne siden") }}
       </span>
+    </li>
+    {{ end }}
+    {{ if and .File (ne $addChildURL "") }}
+    <li>
+      <a href="{{ $addChildURL }}" target="_blank" rel="noopener">
+        <i class="fa fa-plus"></i>
+        <span>{{ i18n "editSwitcherAddChild" | default (cond (eq $lang "en") "Add sub-chapter" "Legg til underkapittel") }}</span>
+      </a>
     </li>
     {{ end }}
     <li>
