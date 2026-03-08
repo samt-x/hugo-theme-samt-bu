@@ -61,10 +61,10 @@
   {{ end }}
 
   {{/* GitHub «create file»-URL for å opprette nytt underkapittel.
-       Inkluderer plassholder-filnavn slik at GitHub forhåndsutfyller
-       mappestruktur: brukeren bytter ut «nytt-kapittel» og beholder /_index.nb.md */}}
-  {{ $contentPath := cond (eq $rel "") "content/nytt-kapittel/_index.nb.md" (printf "content/%s/nytt-kapittel/_index.nb.md" $rel) }}
-  {{ $addChildURL = printf "https://github.com/SAMT-X/%s/new/main/%s" $githubRepo $contentPath }}
+       Stien peker på en eksisterende mappe; ?filename= forhåndsutfyller
+       mappestruktur i filnavnfeltet. Brukeren bytter «nytt-kapittel». */}}
+  {{ $dirPath := cond (eq $rel "") "content" (printf "content/%s" $rel) }}
+  {{ $addChildURL = printf "https://github.com/SAMT-X/%s/new/main/%s/?filename=nytt-kapittel/_index.nb.md" $githubRepo $dirPath }}
 {{ end }}
 
 {{ $portalURL := $portalPath | relURL }}
