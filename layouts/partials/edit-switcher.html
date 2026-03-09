@@ -94,7 +94,7 @@
     {{ end }}
     {{ if and .File (ne $addChildURL "") }}
     <li>
-      <a href="#" data-msg="{{ cond (eq $lang `en`) `Under implementation – please add sub-chapters manually via GitHub or Decap CMS for now.` `Under implementering – legg til underkapitler manuelt via GitHub eller Decap CMS inntil videre.` }}" onclick="alert(this.getAttribute('data-msg')); return false;">
+      <a href="#" data-msg="{{ cond (eq $lang `en`) `Under implementation – please add sub-chapters manually via GitHub for now.` `Under implementering – legg til underkapitler manuelt via GitHub inntil videre.` }}" onclick="alert(this.getAttribute('data-msg')); return false;">
         <i class="fa fa-plus"></i>
         <span>{{ i18n "editSwitcherAddChild" | default (cond (eq $lang "en") "Add sub-chapter" "Legg til underkapittel") }}</span>
       </a>
