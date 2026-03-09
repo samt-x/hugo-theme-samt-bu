@@ -123,7 +123,7 @@
     {{ end }}
     {{ if and .File (ne $entrySlug "") }}
     <li>
-      <a href="#" data-msg="{{ cond (eq $lang `en`) `Under implementation – not yet available.` `Under implementering – ikke tilgjengelig ennå.` }}" onclick="alert(this.getAttribute('data-msg')); return false;">
+      <a href="#" data-msg="{{ cond (eq $lang `en`) `Under implementation – not yet available.` `Oppdatert implementering i arbeid\n\nI påvente av oppdatert implementering kan du gjøre dette via GitHub.` }}" onclick="alert(this.getAttribute('data-msg').replace(/\\n/g,'\n')); return false;">
         <i class="fa fa-plus"></i>
         <span>{{ cond (eq $lang "en") "Page – same level" "Side – samme nivå" }}</span>
       </a>
@@ -131,7 +131,7 @@
     {{ end }}
     {{ if and .File (ne $addChildURL "") }}
     <li>
-      <a href="#" data-msg="{{ cond (eq $lang `en`) `Under implementation – not yet available.` `Under implementering – ikke tilgjengelig ennå.` }}" onclick="alert(this.getAttribute('data-msg')); return false;">
+      <a href="#" data-msg="{{ cond (eq $lang `en`) `Under implementation – not yet available.` `Oppdatert implementering i arbeid\n\nI påvente av oppdatert implementering kan du gjøre dette via GitHub.` }}" onclick="alert(this.getAttribute('data-msg').replace(/\\n/g,'\n')); return false;">
         <i class="fa fa-plus"></i>
         <span>{{ i18n "editSwitcherAddChild" | default (cond (eq $lang "en") "Sub-chapter" "Underkapittel") }}</span>
       </a>
