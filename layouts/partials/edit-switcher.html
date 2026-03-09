@@ -121,19 +121,19 @@
       </span>
     </li>
     {{ end }}
-    {{ if ne $addSiblingURL "" }}
+    {{ if and .File (ne $entrySlug "") }}
     <li>
-      <a href="{{ $addSiblingURL }}" target="_blank" rel="noopener">
+      <a href="#" data-msg="{{ cond (eq $lang `en`) `Under implementation – not yet available.` `Under implementering – ikke tilgjengelig ennå.` }}" onclick="alert(this.getAttribute('data-msg')); return false;">
         <i class="fa fa-plus"></i>
-        <span>{{ cond (eq $lang "en") "+ Page – same level" "+ Side – samme nivå" }}</span>
+        <span>{{ cond (eq $lang "en") "Page – same level" "Side – samme nivå" }}</span>
       </a>
     </li>
     {{ end }}
     {{ if and .File (ne $addChildURL "") }}
     <li>
-      <a href="{{ $addChildURL }}" target="_blank" rel="noopener">
+      <a href="#" data-msg="{{ cond (eq $lang `en`) `Under implementation – not yet available.` `Under implementering – ikke tilgjengelig ennå.` }}" onclick="alert(this.getAttribute('data-msg')); return false;">
         <i class="fa fa-plus"></i>
-        <span>{{ i18n "editSwitcherAddChild" | default (cond (eq $lang "en") "+ Sub-chapter" "+ Underkapittel") }}</span>
+        <span>{{ i18n "editSwitcherAddChild" | default (cond (eq $lang "en") "Sub-chapter" "Underkapittel") }}</span>
       </a>
     </li>
     {{ end }}
