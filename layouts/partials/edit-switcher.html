@@ -61,10 +61,39 @@
   {{ end }}
 
   {{/* GitHub «create file»-URL for å opprette nytt underkapittel.
-       Stien peker på en eksisterende mappe; ?filename= forhåndsutfyller
+       Stien peker på gjeldende mappe; ?filename= forhåndsutfyller
        mappestruktur i filnavnfeltet. Brukeren bytter «nytt-kapittel». */}}
   {{ $dirPath := cond (eq $rel "") "content" (printf "content/%s" $rel) }}
   {{ $addChildURL = printf "https://github.com/SAMT-X/%s/new/main/%s/?filename=nytt-kapittel/_index.nb.md" $githubRepo $dirPath }}
+{{ end }}
+
+{{/* GitHub «create file»-URL for å opprette ny side på samme nivå.
+     Vises kun når $rel != "" (ikke rot-side). */}}
+{{ $addSiblingURL := "" }}
+{{ if and .File (ne $entrySlug "") }}
+  {{ $rel := "" }}
+  {{ if hasPrefix (path.Dir .File.Path) "teams/" }}
+    {{ $rel = strings.TrimPrefix "teams/team-architecture" (path.Dir .File.Path) }}
+    {{ $rel = strings.TrimPrefix "/" $rel }}
+  {{ else if or (eq (path.Dir .File.Path) "utkast") (hasPrefix (path.Dir .File.Path) "utkast/") }}
+    {{ $rel = strings.TrimPrefix "utkast" (path.Dir .File.Path) }}
+    {{ $rel = strings.TrimPrefix "/" $rel }}
+  {{ else if or (eq (path.Dir .File.Path) "loesninger/cms-loesninger/samt-bu-docs") (hasPrefix (path.Dir .File.Path) "loesninger/cms-loesninger/samt-bu-docs/") }}
+    {{ $rel = strings.TrimPrefix "loesninger/cms-loesninger/samt-bu-docs" (path.Dir .File.Path) }}
+    {{ $rel = strings.TrimPrefix "/" $rel }}
+  {{ else }}
+    {{ $rel = strings.TrimPrefix "." (path.Dir .File.Path) }}
+    {{ $rel = strings.TrimPrefix "/" $rel }}
+  {{ end }}
+  {{ if ne $rel "" }}
+    {{ $githubRepoSibling := "samt-bu-docs" }}
+    {{ if hasPrefix (path.Dir .File.Path) "teams/" }}{{ $githubRepoSibling = "team-architecture" }}{{ end }}
+    {{ if or (eq (path.Dir .File.Path) "utkast") (hasPrefix (path.Dir .File.Path) "utkast/") }}{{ $githubRepoSibling = "samt-bu-drafts" }}{{ end }}
+    {{ if or (eq (path.Dir .File.Path) "loesninger/cms-loesninger/samt-bu-docs") (hasPrefix (path.Dir .File.Path) "loesninger/cms-loesninger/samt-bu-docs/") }}{{ $githubRepoSibling = "solution-samt-bu-docs" }}{{ end }}
+    {{ $parentRel := path.Dir $rel }}
+    {{ $parentDirPath := cond (eq $parentRel ".") "content" (printf "content/%s" $parentRel) }}
+    {{ $addSiblingURL = printf "https://github.com/SAMT-X/%s/new/main/%s/?filename=nytt-kapittel/_index.nb.md" $githubRepoSibling $parentDirPath }}
+  {{ end }}
 {{ end }}
 
 {{ $portalURL := $portalPath | relURL }}
@@ -92,11 +121,19 @@
       </span>
     </li>
     {{ end }}
+    {{ if ne $addSiblingURL "" }}
+    <li>
+      <a href="{{ $addSiblingURL }}" target="_blank" rel="noopener">
+        <i class="fa fa-plus"></i>
+        <span>{{ cond (eq $lang "en") "+ Page – same level" "+ Side – samme nivå" }}</span>
+      </a>
+    </li>
+    {{ end }}
     {{ if and .File (ne $addChildURL "") }}
     <li>
-      <a href="#" data-msg="{{ cond (eq $lang `en`) `Under implementation – please add sub-chapters manually via GitHub for now.` `Under implementering – legg til underkapitler manuelt via GitHub inntil videre.` }}" onclick="alert(this.getAttribute('data-msg')); return false;">
+      <a href="{{ $addChildURL }}" target="_blank" rel="noopener">
         <i class="fa fa-plus"></i>
-        <span>{{ i18n "editSwitcherAddChild" | default (cond (eq $lang "en") "Add sub-chapter" "Legg til underkapittel") }}</span>
+        <span>{{ i18n "editSwitcherAddChild" | default (cond (eq $lang "en") "+ Sub-chapter" "+ Underkapittel") }}</span>
       </a>
     </li>
     {{ end }}
