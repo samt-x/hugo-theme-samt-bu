@@ -67,31 +67,35 @@
   {{ $addChildURL = printf "https://github.com/SAMT-X/%s/new/main/%s/?filename=nytt-kapittel/_index.nb.md" $githubRepo $dirPath }}
 {{ end }}
 
-{{/* GitHub «create file»-URL for å opprette ny side på samme nivå.
-     Vises kun når $rel != "" (ikke rot-side). */}}
+{{/* Variabler for «Side – samme nivå»-dialogen */}}
+{{ $siblingRepo := "" }}
+{{ $siblingParentPath := "" }}
 {{ $addSiblingURL := "" }}
 {{ if and .File (ne $entrySlug "") }}
   {{ $rel := "" }}
-  {{ if hasPrefix (path.Dir .File.Path) "teams/" }}
-    {{ $rel = strings.TrimPrefix "teams/team-architecture" (path.Dir .File.Path) }}
+  {{ $dir := path.Dir .File.Path }}
+  {{ if hasPrefix $dir "teams/" }}
+    {{ $rel = strings.TrimPrefix "teams/team-architecture" $dir }}
     {{ $rel = strings.TrimPrefix "/" $rel }}
-  {{ else if or (eq (path.Dir .File.Path) "utkast") (hasPrefix (path.Dir .File.Path) "utkast/") }}
-    {{ $rel = strings.TrimPrefix "utkast" (path.Dir .File.Path) }}
+  {{ else if or (eq $dir "utkast") (hasPrefix $dir "utkast/") }}
+    {{ $rel = strings.TrimPrefix "utkast" $dir }}
     {{ $rel = strings.TrimPrefix "/" $rel }}
-  {{ else if or (eq (path.Dir .File.Path) "loesninger/cms-loesninger/samt-bu-docs") (hasPrefix (path.Dir .File.Path) "loesninger/cms-loesninger/samt-bu-docs/") }}
-    {{ $rel = strings.TrimPrefix "loesninger/cms-loesninger/samt-bu-docs" (path.Dir .File.Path) }}
+  {{ else if or (eq $dir "loesninger/cms-loesninger/samt-bu-docs") (hasPrefix $dir "loesninger/cms-loesninger/samt-bu-docs/") }}
+    {{ $rel = strings.TrimPrefix "loesninger/cms-loesninger/samt-bu-docs" $dir }}
     {{ $rel = strings.TrimPrefix "/" $rel }}
   {{ else }}
-    {{ $rel = strings.TrimPrefix "." (path.Dir .File.Path) }}
+    {{ $rel = strings.TrimPrefix "." $dir }}
     {{ $rel = strings.TrimPrefix "/" $rel }}
   {{ end }}
   {{ if ne $rel "" }}
     {{ $githubRepoSibling := "samt-bu-docs" }}
-    {{ if hasPrefix (path.Dir .File.Path) "teams/" }}{{ $githubRepoSibling = "team-architecture" }}{{ end }}
-    {{ if or (eq (path.Dir .File.Path) "utkast") (hasPrefix (path.Dir .File.Path) "utkast/") }}{{ $githubRepoSibling = "samt-bu-drafts" }}{{ end }}
-    {{ if or (eq (path.Dir .File.Path) "loesninger/cms-loesninger/samt-bu-docs") (hasPrefix (path.Dir .File.Path) "loesninger/cms-loesninger/samt-bu-docs/") }}{{ $githubRepoSibling = "solution-samt-bu-docs" }}{{ end }}
+    {{ if hasPrefix $dir "teams/" }}{{ $githubRepoSibling = "team-architecture" }}{{ end }}
+    {{ if or (eq $dir "utkast") (hasPrefix $dir "utkast/") }}{{ $githubRepoSibling = "samt-bu-drafts" }}{{ end }}
+    {{ if or (eq $dir "loesninger/cms-loesninger/samt-bu-docs") (hasPrefix $dir "loesninger/cms-loesninger/samt-bu-docs/") }}{{ $githubRepoSibling = "solution-samt-bu-docs" }}{{ end }}
     {{ $parentRel := path.Dir $rel }}
     {{ $parentDirPath := cond (eq $parentRel ".") "content" (printf "content/%s" $parentRel) }}
+    {{ $siblingRepo = $githubRepoSibling }}
+    {{ $siblingParentPath = $parentDirPath }}
     {{ $addSiblingURL = printf "https://github.com/SAMT-X/%s/new/main/%s/?filename=nytt-kapittel/_index.nb.md" $githubRepoSibling $parentDirPath }}
   {{ end }}
 {{ end }}
@@ -123,7 +127,7 @@
     {{ end }}
     {{ if and .File (ne $addSiblingURL "") }}
     <li>
-      <a href="{{ $addSiblingURL }}" target="_blank" rel="noopener">
+      <a href="#" onclick="openNewSiblingDialog('{{ $siblingRepo }}', '{{ $siblingParentPath }}', '{{ $lang }}'); return false;">
         <i class="fa fa-plus"></i>
         <span>{{ cond (eq $lang "en") "Page – same level" "Side – samme nivå" }}</span>
       </a>
@@ -131,7 +135,7 @@
     {{ end }}
     {{ if and .File (ne $addChildURL "") }}
     <li>
-      <a href="{{ $addChildURL }}" target="_blank" rel="noopener">
+      <a href="#" data-msg="{{ cond (eq $lang `en`) `Under implementation – not yet available.` `Oppdatert implementering i arbeid\n\nI påvente av oppdatert implementering kan du gjøre dette via GitHub.` }}" onclick="alert(this.getAttribute('data-msg').replace(/\\n/g,'\n')); return false;">
         <i class="fa fa-plus"></i>
         <span>{{ i18n "editSwitcherAddChild" | default (cond (eq $lang "en") "Sub-chapter" "Underkapittel") }}</span>
       </a>
@@ -144,4 +148,66 @@
       </a>
     </li>
   </ul>
+</div>
+
+{{/* Modal: Ny side – samme nivå */}}
+<div id="np-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:99999; align-items:center; justify-content:center;">
+  <div style="background:#fff; border-radius:6px; padding:1.75rem; width:min(560px,92vw); max-height:90vh; overflow-y:auto; color:#222; box-shadow:0 8px 32px rgba(0,0,0,.25);">
+    <h3 id="np-dialog-title" style="margin:0 0 1.25rem; font-size:1.1rem; color:#1a4a8a;">Ny side – samme nivå</h3>
+    <form id="np-form" onsubmit="return false;">
+      <div style="margin-bottom:.85rem;">
+        <label style="display:block; font-weight:600; margin-bottom:.3rem; font-size:.9rem;">Mappenavn (URL-slug)</label>
+        <input id="np-slug" type="text" placeholder="nytt-kapittel" autocomplete="off"
+          style="width:100%; box-sizing:border-box; padding:.45rem .65rem; border:1px solid #bbb; border-radius:4px; font-size:.95rem;">
+        <small style="color:#666; font-size:.8rem;">Bare små bokstaver, tall og bindestrek. Blir URL-segmentet til siden.</small>
+      </div>
+      <div style="margin-bottom:.85rem;">
+        <label style="display:block; font-weight:600; margin-bottom:.3rem; font-size:.9rem;">Tittel (norsk) <span style="color:#c00;">*</span></label>
+        <input id="np-title-nb" type="text" autocomplete="off"
+          style="width:100%; box-sizing:border-box; padding:.45rem .65rem; border:1px solid #bbb; border-radius:4px; font-size:.95rem;">
+      </div>
+      <div style="margin-bottom:.85rem;">
+        <label style="display:block; font-weight:600; margin-bottom:.3rem; font-size:.9rem;">Korttittel – menyen (norsk)</label>
+        <input id="np-linktitle-nb" type="text" autocomplete="off"
+          style="width:100%; box-sizing:border-box; padding:.45rem .65rem; border:1px solid #bbb; border-radius:4px; font-size:.95rem;">
+        <small style="color:#666; font-size:.8rem;">La stå tom for å bruke tittelen.</small>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:.75rem; margin-bottom:.85rem;">
+        <div>
+          <label style="display:block; font-weight:600; margin-bottom:.3rem; font-size:.9rem;">Vekt (rekkefølge)</label>
+          <input id="np-weight" type="number" min="1" autocomplete="off"
+            style="width:100%; box-sizing:border-box; padding:.45rem .65rem; border:1px solid #bbb; border-radius:4px; font-size:.95rem;">
+          <small style="color:#666; font-size:.8rem;">Lavere tall vises først.</small>
+        </div>
+        <div>
+          <label style="display:block; font-weight:600; margin-bottom:.3rem; font-size:.9rem;">Status</label>
+          <select id="np-status"
+            style="width:100%; box-sizing:border-box; padding:.45rem .65rem; border:1px solid #bbb; border-radius:4px; font-size:.95rem; background:#fff;">
+            <option value="Ny" selected>Ny</option>
+            <option value="Tidlig utkast">Tidlig utkast</option>
+            <option value="Pågår">Pågår</option>
+            <option value="Til QA">Til QA</option>
+            <option value="Godkjent">Godkjent</option>
+            <option value="Avbrutt">Avbrutt</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-bottom:1rem;">
+        <label style="display:block; font-weight:600; margin-bottom:.3rem; font-size:.9rem;">Innhold (markdown)</label>
+        <textarea id="np-body" rows="6"
+          style="width:100%; box-sizing:border-box; padding:.45rem .65rem; border:1px solid #bbb; border-radius:4px; font-size:.9rem; font-family:monospace; resize:vertical;"></textarea>
+      </div>
+      <div id="np-msg" style="display:none; margin-bottom:.85rem; padding:.6rem .75rem; border-radius:4px; font-size:.9rem;"></div>
+      <div style="display:flex; gap:.6rem; justify-content:flex-end;">
+        <button type="button" id="np-cancel"
+          style="padding:.45rem 1.1rem; border:1px solid #bbb; border-radius:4px; background:#fff; cursor:pointer; font-size:.95rem;">
+          Avbryt
+        </button>
+        <button type="submit" id="np-submit"
+          style="padding:.45rem 1.2rem; border:none; border-radius:4px; background:#1a4a8a; color:#fff; cursor:pointer; font-size:.95rem; font-weight:600;">
+          Opprett side
+        </button>
+      </div>
+    </form>
+  </div>
 </div>

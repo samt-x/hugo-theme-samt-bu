@@ -57,3 +57,180 @@
   });
 })();
 </script>
+
+<!-- Ny side – samme nivå: dialog og GitHub API -->
+<script>
+(function() {
+  var overlay = document.getElementById('np-overlay');
+  if (!overlay) return;
+
+  var npRepo = '';
+  var npParentPath = '';
+  var npLang = 'nb';
+
+  var STATUS_EN_MAP = {
+    'Ny': 'New',
+    'Tidlig utkast': 'Early draft',
+    'Pågår': 'In progress',
+    'Til QA': 'For QA',
+    'Godkjent': 'Approved',
+    'Avbrutt': 'Cancelled'
+  };
+
+  function getDecapToken() {
+    var keys = ['netlify-cms-user', 'decap-cms-user'];
+    for (var i = 0; i < keys.length; i++) {
+      try {
+        var val = localStorage.getItem(keys[i]);
+        if (val) {
+          var parsed = JSON.parse(val);
+          if (parsed && parsed.token) return parsed.token;
+        }
+      } catch(e) {}
+    }
+    return null;
+  }
+
+  window.openNewSiblingDialog = function(repo, parentPath, lang) {
+    npRepo = repo;
+    npParentPath = parentPath;
+    npLang = lang || 'nb';
+
+    var token = getDecapToken();
+    if (!token) {
+      alert(npLang === 'en'
+        ? 'You must be logged in via Decap CMS (the Edit menu) before creating new pages.'
+        : 'Du må logge inn via Decap CMS (Endre-menyen) før du kan opprette nye sider.');
+      return;
+    }
+
+    document.getElementById('np-form').reset();
+    document.getElementById('np-status').value = 'Ny';
+    hideMsg();
+    var submitBtn = document.getElementById('np-submit');
+    submitBtn.disabled = false;
+    submitBtn.textContent = npLang === 'en' ? 'Create page' : 'Opprett side';
+
+    overlay.style.display = 'flex';
+  };
+
+  document.getElementById('np-cancel').addEventListener('click', function() {
+    overlay.style.display = 'none';
+  });
+
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) overlay.style.display = 'none';
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && overlay.style.display === 'flex') overlay.style.display = 'none';
+  });
+
+  document.getElementById('np-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    var token = getDecapToken();
+    if (!token) {
+      showMsg('error', npLang === 'en' ? 'Not logged in. Please log in via Decap CMS and try again.' : 'Ikke innlogget. Logg inn via Decap CMS og prøv igjen.');
+      return;
+    }
+
+    var slug        = document.getElementById('np-slug').value.trim();
+    var titleNb     = document.getElementById('np-title-nb').value.trim();
+    var linkTitleNb = document.getElementById('np-linktitle-nb').value.trim();
+    var weight      = document.getElementById('np-weight').value.trim();
+    var statusNb    = document.getElementById('np-status').value;
+    var body        = document.getElementById('np-body').value;
+
+    if (!slug) { showMsg('error', 'Mappenavn er påkrevd.'); return; }
+    if (!titleNb) { showMsg('error', 'Tittel er påkrevd.'); return; }
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) {
+      showMsg('error', 'Mappenavn kan bare inneholde små bokstaver (a-z), tall og bindestrek, og må starte med bokstav eller tall.');
+      return;
+    }
+
+    var submitBtn = document.getElementById('np-submit');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Oppretter…';
+    hideMsg();
+
+    var nbPath = npParentPath + '/' + slug + '/_index.nb.md';
+    var enPath = npParentPath + '/' + slug + '/_index.en.md';
+    var statusEn = STATUS_EN_MAP[statusNb] || 'New';
+
+    var nbLines = ['---', 'title: ' + yamlStr(titleNb)];
+    if (linkTitleNb) nbLines.push('linkTitle: ' + yamlStr(linkTitleNb));
+    if (weight) nbLines.push('weight: ' + parseInt(weight, 10));
+    nbLines.push('status: ' + statusNb);
+    nbLines.push('# Gyldige verdier: Ny | Tidlig utkast | Pågår | Til QA | Godkjent | Avbrutt');
+    nbLines.push('---');
+    if (body) { nbLines.push(''); nbLines.push(body); }
+    var nbContent = nbLines.join('\n') + '\n';
+
+    var enTitle = titleNb; // bruker norsk tittel som placeholder
+    var enLines = ['---', 'title: ' + yamlStr(enTitle)];
+    if (linkTitleNb) enLines.push('linkTitle: ' + yamlStr(linkTitleNb));
+    if (weight) enLines.push('weight: ' + parseInt(weight, 10));
+    enLines.push('status: ' + statusEn);
+    enLines.push('# Valid values: New | Early draft | In progress | For QA | Approved | Cancelled');
+    enLines.push('---');
+    enLines.push('');
+    enLines.push('*English translation TBD.*');
+    var enContent = enLines.join('\n') + '\n';
+
+    var commitMsg = 'Ny side: ' + titleNb;
+
+    createFile(token, npRepo, nbPath, nbContent, commitMsg)
+      .then(function() {
+        return createFile(token, npRepo, enPath, enContent, commitMsg + ' (en placeholder)');
+      })
+      .then(function() {
+        showMsg('success', '✓ Siden ble opprettet! Nettstedet bygges om automatisk (tar ~1 minutt).');
+        submitBtn.textContent = 'Opprettet ✓';
+      })
+      .catch(function(err) {
+        showMsg('error', 'Feil: ' + err.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Opprett side';
+      });
+  });
+
+  function yamlStr(s) {
+    if (/[:#\[\]{}&*!|>'"%@`,]/.test(s) || s !== s.trim()) {
+      return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+    }
+    return s;
+  }
+
+  function createFile(token, repo, path, content, message) {
+    var encoded = btoa(unescape(encodeURIComponent(content)));
+    return fetch('https://api.github.com/repos/SAMT-X/' + repo + '/contents/' + path, {
+      method: 'PUT',
+      headers: {
+        'Authorization': 'token ' + token,
+        'Content-Type': 'application/json',
+        'Accept': 'application/vnd.github+json'
+      },
+      body: JSON.stringify({ message: message, content: encoded, branch: 'main' })
+    }).then(function(r) {
+      if (!r.ok) return r.json().then(function(j) {
+        throw new Error(j.message || r.statusText);
+      });
+      return r.json();
+    });
+  }
+
+  function showMsg(type, text) {
+    var el = document.getElementById('np-msg');
+    el.style.display = 'block';
+    el.style.background = type === 'error' ? '#fff0f0' : '#f0fff4';
+    el.style.border    = '1px solid ' + (type === 'error' ? '#f5c6c6' : '#b2dfdb');
+    el.style.color     = type === 'error' ? '#900' : '#1b5e20';
+    el.textContent = text;
+  }
+
+  function hideMsg() {
+    document.getElementById('np-msg').style.display = 'none';
+  }
+})();
+</script>
