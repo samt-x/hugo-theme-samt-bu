@@ -523,7 +523,7 @@ function getDecapToken() {
             return;
           }
           if (run.status === 'queued') {
-            statusEl.textContent = delLang === 'en' ? 'Build queued…' : 'Byggejobben er i kø…';
+            statusEl.textContent = (delLang === 'en' ? 'Build queued… (' : 'Byggejobben er i kø… (') + elapsed + 's)';
           } else if (run.status === 'in_progress') {
             statusEl.textContent = (delLang === 'en' ? 'Building… (' : 'Bygger… (') + elapsed + 's)';
           } else if (run.status === 'completed') {
@@ -531,9 +531,9 @@ function getDecapToken() {
             activePollTimer = null;
             var doneBtn = document.getElementById('del-panel-done');
             if (run.conclusion === 'success') {
-              statusEl.textContent = delLang === 'en' ? '✓ Done! Refreshing in 3s…' : '✓ Ferdig! Oppdaterer siden om 3 sek…';
+              statusEl.textContent = delLang === 'en' ? '✓ Done! Navigating in 3s…' : '✓ Ferdig! Navigerer om 3 sek…';
               if (doneBtn) doneBtn.style.display = 'inline-block';
-              setTimeout(function() { window.location.reload(); }, 3000);
+              setTimeout(function() { window.location.href = delParentUrl; }, 3000);
             } else {
               statusEl.textContent = (delLang === 'en' ? '⚠ Build ended: ' : '⚠ Byggejobben avsluttet: ') + run.conclusion;
               if (doneBtn) doneBtn.style.display = 'inline-block';
@@ -547,7 +547,7 @@ function getDecapToken() {
 
     document.getElementById('del-panel-done').onclick = function() {
       clearInterval(activePollTimer); activePollTimer = null;
-      window.location.reload();
+      window.location.href = delParentUrl;
     };
   }
 })();

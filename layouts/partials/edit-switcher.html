@@ -14,6 +14,9 @@
 {{ $dirPath := "" }}
 {{ $parentUrl := "/" | relURL }}
 {{ with .Parent }}{{ $parentUrl = .RelPermalink }}{{ end }}
+{{/* Etter sletting: gå til forrige søsken om den finnes, ellers til forelder */}}
+{{ $afterDeleteUrl := $parentUrl }}
+{{ with .PrevInSection }}{{ $afterDeleteUrl = .RelPermalink }}{{ end }}
 
 {{ if .File }}
   {{/* path.Dir normaliserer Windows-backslash til forward slash */}}
@@ -152,7 +155,7 @@
     </li>
     {{ if and .File (ne $entrySlug "") (ne $dirPath "content") }}
     <li style="border-top:1px solid #f5e0e0; margin-top:3px; padding-top:3px;">
-      <a href="#" onclick="openDeleteDialog('{{ $githubRepo }}', '{{ $dirPath }}', '{{ $lang }}', {{ .Title | jsonify }}, '{{ $parentUrl }}'); return false;" style="color:#b00020;">
+      <a href="#" onclick="openDeleteDialog('{{ $githubRepo }}', '{{ $dirPath }}', '{{ $lang }}', {{ .Title | jsonify }}, '{{ $afterDeleteUrl }}'); return false;" style="color:#b00020;">
         <i class="fa fa-trash-o"></i>
         <span>{{ cond (eq $lang "en") "Delete this page" "Slett denne siden" }}</span>
       </a>
