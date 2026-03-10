@@ -231,17 +231,19 @@
     var enContent = enLines.join('\n') + '\n';
 
     var commitMsg = 'Ny side: ' + titleNb;
-
-    createFilesInOneCommit(token, npRepo, [
+    var weightInt = weight ? parseInt(weight, 10) : null;
+    var newFiles = [
       { path: nbPath, content: nbContent },
       { path: enPath, content: enContent }
-    ], commitMsg)
-      .then(function() {
-        if (weight) {
-          submitBtn.textContent = 'Justerer rekkefølge…';
-          return shiftSiblings(token, npRepo, npParentPath, parseInt(weight, 10), slug);
-        }
-      })
+    ];
+
+    // Hent søskenfiler for vektjustering parallelt, så alt går i én commit
+    (weightInt
+      ? fetchSiblingWeightUpdates(token, npRepo, npParentPath, weightInt, slug)
+      : Promise.resolve([])
+    ).then(function(siblingUpdates) {
+      return createFilesInOneCommit(token, npRepo, newFiles.concat(siblingUpdates), commitMsg);
+    })
       .then(function() {
         showMsg('success', '✓ Siden ble opprettet! Nettstedet bygges om automatisk (tar ~1 minutt).');
         submitBtn.textContent = 'Opprettet ✓';
@@ -253,15 +255,15 @@
       });
   });
 
-  // Samler alle vektjusteringer i én enkelt commit
-  function shiftSiblings(token, repo, parentPath, minWeight, excludeSlug) {
+  // Returnerer liste over filer som trenger vektjustering (committer ikke selv)
+  function fetchSiblingWeightUpdates(token, repo, parentPath, minWeight, excludeSlug) {
     var apiBase = 'https://api.github.com/repos/SAMT-X/' + repo;
     var headers = { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github+json' };
 
     return fetch(apiBase + '/contents/' + parentPath, { headers: headers })
       .then(function(r) { return r.json(); })
       .then(function(entries) {
-        if (!Array.isArray(entries)) return;
+        if (!Array.isArray(entries)) return [];
         var dirs = entries.filter(function(e) { return e.type === 'dir' && e.name !== excludeSlug; });
         var fetches = [];
         dirs.forEach(function(dir) {
@@ -278,9 +280,8 @@
         return Promise.all(fetches);
       })
       .then(function(results) {
-        if (!results) return;
         var updates = [];
-        results.forEach(function(item) {
+        (results || []).forEach(function(item) {
           if (!item || !item.data || !item.data.content) return;
           var content = decodeURIComponent(escape(atob(item.data.content.replace(/\n/g, ''))));
           var match = content.match(/^weight:\s*(\d+)/m);
@@ -289,8 +290,7 @@
           if (w < minWeight) return;
           updates.push({ path: item.path, content: content.replace(/^(weight:\s*)\d+/m, '$1' + (w + 1)) });
         });
-        if (updates.length === 0) return;
-        return createFilesInOneCommit(token, repo, updates, 'Auto: juster vekt etter ny side');
+        return updates;
       });
   }
 
