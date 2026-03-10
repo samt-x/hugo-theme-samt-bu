@@ -528,11 +528,7 @@ function getDecapToken() {
             statusEl.textContent = (delLang === 'en' ? 'Waiting for build to start… (' : 'Bygging av nettstedet starter om litt… (') + elapsed + 's)';
             return;
           }
-          if (run.status === 'queued') {
-            statusEl.textContent = (delLang === 'en'
-              ? 'Build queued… (' + elapsed + 's)'
-              : 'Bygging av nettstedet er i kø… (' + elapsed + 's)');
-          } else if (run.status === 'in_progress') {
+          if (run.status === 'queued' || run.status === 'in_progress') {
             statusEl.textContent = (delLang === 'en'
               ? 'Building site – expected ~1 min – ' + elapsed + 's so far'
               : 'Bygging av nettstedet pågår – forventet ~1 min – ' + elapsed + ' sek så langt');
