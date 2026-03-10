@@ -444,6 +444,7 @@ function getDecapToken() {
     deleteFilesInOneCommit(token, delRepo, [nbPath, enPath], 'Slett side: ' + delTitle)
       .then(function() {
         showBuildPanel();
+        showJobIndicator();
         pollBuild(startTime);
       })
       .catch(function(err) {
@@ -495,6 +496,16 @@ function getDecapToken() {
     document.getElementById('del-panel-done').style.display = 'none';
   }
 
+  function showJobIndicator() {
+    var el = document.getElementById('del-job-indicator');
+    if (el) el.style.display = 'flex';
+  }
+
+  function hideJobIndicator() {
+    var el = document.getElementById('del-job-indicator');
+    if (el) el.style.display = 'none';
+  }
+
   function navAfterDelete() {
     var url = delParentUrl;
     url += (url.indexOf('?') >= 0 ? '&' : '?') + '_=' + Date.now();
@@ -538,6 +549,7 @@ function getDecapToken() {
             activePollTimer = null;
             var doneBtn = document.getElementById('del-panel-done');
             if (run.conclusion === 'success') {
+              hideJobIndicator();
               if (doneBtn) doneBtn.style.display = 'inline-block';
               var secs = 3;
               statusEl.textContent = (delLang === 'en' ? '✓ Done! Navigating in ' : '✓ Ferdig! Navigerer om ') + secs + (delLang === 'en' ? 's…' : ' sek…');
@@ -552,6 +564,7 @@ function getDecapToken() {
                 if (el) el.textContent = (delLang === 'en' ? '✓ Done! Navigating in ' : '✓ Ferdig! Navigerer om ') + secs + (delLang === 'en' ? 's…' : ' sek…');
               }, 1000);
             } else {
+              hideJobIndicator();
               statusEl.textContent = (delLang === 'en' ? '⚠ Build ended: ' : '⚠ Byggejobben avsluttet: ') + run.conclusion;
               if (doneBtn) doneBtn.style.display = 'inline-block';
             }
@@ -564,6 +577,7 @@ function getDecapToken() {
 
     document.getElementById('del-panel-done').onclick = function() {
       clearInterval(activePollTimer); activePollTimer = null;
+      hideJobIndicator();
       navAfterDelete();
     };
   }

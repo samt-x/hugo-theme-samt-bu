@@ -214,6 +214,12 @@
   </div>
 </div>
 
+{{/* Statusindikator i bunnen – vises mens oppdateringsjobb kjører i bakgrunnen */}}
+<div id="del-job-indicator" style="display:none; position:fixed; bottom:0; left:0; z-index:9998; background:rgba(30,30,30,0.93); color:#e8e8e8; padding:3px 14px 3px 10px; font-size:13px; border-radius:0 4px 0 0; align-items:center; gap:7px;">
+  <i class="fa fa-spinner fa-spin" style="font-size:12px; opacity:.85;"></i>
+  <span>{{ cond (eq $lang "en") "Update in progress" "Oppdateringsjobb pågår" }}</span>
+</div>
+
 {{/* Modal: Ny side – samme nivå */}}
 <div id="np-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:99999;">
   <div id="np-dialog" style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:#fff; border-radius:6px; width:min(560px,92vw); min-width:320px; min-height:220px; color:#222; box-shadow:0 8px 32px rgba(0,0,0,.28); font-size:16px; resize:both; overflow:auto;">
