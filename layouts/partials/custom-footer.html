@@ -494,6 +494,12 @@ function getDecapToken() {
     document.getElementById('del-panel-done').style.display = 'none';
   }
 
+  function navAfterDelete() {
+    var url = delParentUrl;
+    url += (url.indexOf('?') >= 0 ? '&' : '?') + '_=' + Date.now();
+    window.location.href = url;
+  }
+
   function pollBuild(startTime) {
     var token = getDecapToken();
     var h = { 'Accept': 'application/vnd.github+json' };
@@ -523,9 +529,13 @@ function getDecapToken() {
             return;
           }
           if (run.status === 'queued') {
-            statusEl.textContent = (delLang === 'en' ? 'Build queued… (' : 'Byggejobben er i kø… (') + elapsed + 's)';
+            statusEl.textContent = (delLang === 'en'
+              ? 'Build queued… (' + elapsed + 's)'
+              : 'Byggejobben er i kø… (' + elapsed + 's)');
           } else if (run.status === 'in_progress') {
-            statusEl.textContent = (delLang === 'en' ? 'Building… (' : 'Bygger… (') + elapsed + 's)';
+            statusEl.textContent = (delLang === 'en'
+              ? 'Building site – expected ~1 min – ' + elapsed + 's so far'
+              : 'Bygging av nettsted pågår – forventet ~1 min – ' + elapsed + ' sek så langt');
           } else if (run.status === 'completed') {
             clearInterval(activePollTimer);
             activePollTimer = null;
@@ -538,7 +548,7 @@ function getDecapToken() {
                 secs--;
                 if (secs <= 0) {
                   clearInterval(cdTimer);
-                  window.location.href = delParentUrl;
+                  navAfterDelete();
                   return;
                 }
                 var el = document.getElementById('del-build-status-text');
@@ -557,7 +567,7 @@ function getDecapToken() {
 
     document.getElementById('del-panel-done').onclick = function() {
       clearInterval(activePollTimer); activePollTimer = null;
-      window.location.href = delParentUrl;
+      navAfterDelete();
     };
   }
 })();

@@ -14,12 +14,28 @@
 {{ $dirPath := "" }}
 {{ $parentUrl := "/" | relURL }}
 {{ with .Parent }}{{ $parentUrl = .RelPermalink }}{{ end }}
-{{/* Etter sletting: gå til forrige søsken, ellers neste søsken, ellers forelder */}}
+{{/* Etter sletting: gå til forrige søsken, ellers neste søsken, ellers forelder.
+     .PrevInSection/.NextInSection fungerer ikke for section-sider (_index.md),
+     så vi itererer .Parent.Pages manuelt. */}}
 {{ $afterDeleteUrl := $parentUrl }}
-{{ if .PrevInSection }}
-  {{ $afterDeleteUrl = .PrevInSection.RelPermalink }}
-{{ else if .NextInSection }}
-  {{ $afterDeleteUrl = .NextInSection.RelPermalink }}
+{{ if .Parent }}
+  {{ $currentUrl := .RelPermalink }}
+  {{ $prevUrl := "" }}
+  {{ $useNext := false }}
+  {{ range .Parent.Pages }}
+    {{ if $useNext }}
+      {{ if eq $afterDeleteUrl $parentUrl }}{{ $afterDeleteUrl = .RelPermalink }}{{ end }}
+      {{ $useNext = false }}
+    {{ end }}
+    {{ if eq .RelPermalink $currentUrl }}
+      {{ if ne $prevUrl "" }}
+        {{ $afterDeleteUrl = $prevUrl }}
+      {{ else }}
+        {{ $useNext = true }}
+      {{ end }}
+    {{ end }}
+    {{ $prevUrl = .RelPermalink }}
+  {{ end }}
 {{ end }}
 
 {{ if .File }}
