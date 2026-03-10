@@ -247,17 +247,22 @@
   /* alwaysopen-noder: hold barn synlige, men IKKE bold (parent-klassen brukes til brødsmuleindikasjon) */
   #sidebar ul.topics li.alwaysopen > ul { display: block; }
 
-  /* Pilikon er søsken av <a> (ikke barn) – adskilt klikkområde, ingen navigasjon ved klikk */
-  #sidebar ul li { position: relative; }
-  #sidebar ul li > i.category-icon {
-    position: absolute;
-    right: 6px;
-    top: 50%;
-    transform: translateY(-50%);
-    cursor: pointer;
-    padding: 6px 8px;
+  /* Pilikon i flex-rad ved siden av <a> – adskilt klikkområde, ingen navigasjon ved klikk */
+  #sidebar ul li > .sidebar-link-row {
+    display: flex;
+    align-items: stretch;
   }
-  #sidebar ul li > a { padding-right: 28px; }
+  #sidebar ul li > .sidebar-link-row > a {
+    flex: 1;
+    min-width: 0;
+  }
+  #sidebar ul li > .sidebar-link-row > i.category-icon {
+    cursor: pointer;
+    padding: 9px 10px 9px 4px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+  }
 
   /* Toggle buttons (inside heading rows) */
   .sidebar-toggle-btn {

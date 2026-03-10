@@ -55,24 +55,25 @@
         {{if eq .RelPermalink $currentNode.RelPermalink}}active{{end}}
         {{if .Params.alwaysopen}}alwaysopen{{end}}
         ">
-      <a href="{{ .RelPermalink}}">
-        <span>{{safeHTML .Params.Pre}}{{ partial "status-symbol.html" . }}{{.LinkTitle}}{{safeHTML .Params.Post}}</span>
+      {{ $numberOfPages := (add (len .Pages) (len .Sections)) }}
+      <div class="sidebar-link-row">
+        <a href="{{ .RelPermalink}}">
+          <span>{{safeHTML .Params.Pre}}{{ partial "status-symbol.html" . }}{{.LinkTitle}}{{safeHTML .Params.Post}}</span>
 
-        {{if .Params.titleSup }}
-          <sup>{{.Params.titleSup}}</sup>
-        {{end}}
+          {{if .Params.titleSup }}
+            <sup>{{.Params.titleSup}}</sup>
+          {{end}}
 
-        {{ $numberOfPages := (add (len .Pages) (len .Sections)) }}
-
-        {{ if $showvisitedlinks}}<i style="color:grey" class="fa fa-circle-thin read-icon"></i>{{end}}
-      </a>
-      {{ if ne $numberOfPages 0 }}
-        {{if or (.IsAncestor $currentNode) (eq .RelPermalink $currentNode.RelPermalink) (.Params.alwaysopen) }}
-          <i class="fa fa-sort-down fa-lg category-icon"></i>
-        {{else}}
-          <i class="fa fa-caret-right fa-lg category-icon"></i>
-        {{end}}
-      {{ end }}
+          {{ if $showvisitedlinks}}<i style="color:grey" class="fa fa-circle-thin read-icon"></i>{{end}}
+        </a>
+        {{ if ne $numberOfPages 0 }}
+          {{if or (.IsAncestor $currentNode) (eq .RelPermalink $currentNode.RelPermalink) (.Params.alwaysopen) }}
+            <i class="fa fa-sort-down fa-lg category-icon"></i>
+          {{else}}
+            <i class="fa fa-caret-right fa-lg category-icon"></i>
+          {{end}}
+        {{ end }}
+      </div>
       {{ if ne $numberOfPages 0 }}
         <ul>
           {{ .Scratch.Set "pages" .Pages }}
