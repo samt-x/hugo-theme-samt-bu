@@ -232,10 +232,10 @@
 
     var commitMsg = 'Ny side: ' + titleNb;
 
-    createFile(token, npRepo, nbPath, nbContent, commitMsg)
-      .then(function() {
-        return createFile(token, npRepo, enPath, enContent, commitMsg + ' (en placeholder)');
-      })
+    createFilesInOneCommit(token, npRepo, [
+      { path: nbPath, content: nbContent },
+      { path: enPath, content: enContent }
+    ], commitMsg)
       .then(function() {
         if (weight) {
           submitBtn.textContent = 'Justerer rekkefølge…';
@@ -302,6 +302,51 @@
       return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
     }
     return s;
+  }
+
+  // Oppretter flere filer i én enkelt commit via Git Data API (unngår dobbel Hugo-bygg og race condition)
+  function createFilesInOneCommit(token, repo, files, commitMsg) {
+    var apiBase = 'https://api.github.com/repos/SAMT-X/' + repo;
+    var headers = {
+      'Authorization': 'token ' + token,
+      'Accept': 'application/vnd.github+json',
+      'Content-Type': 'application/json'
+    };
+    var currentSha;
+    return fetch(apiBase + '/git/ref/heads/main', { headers: headers })
+      .then(function(r) { return r.json(); })
+      .then(function(ref) {
+        currentSha = ref.object.sha;
+        return fetch(apiBase + '/git/commits/' + currentSha, { headers: headers });
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(commit) {
+        var treeItems = files.map(function(f) {
+          return { path: f.path, mode: '100644', type: 'blob', content: f.content };
+        });
+        return fetch(apiBase + '/git/trees', {
+          method: 'POST', headers: headers,
+          body: JSON.stringify({ base_tree: commit.tree.sha, tree: treeItems })
+        });
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(tree) {
+        return fetch(apiBase + '/git/commits', {
+          method: 'POST', headers: headers,
+          body: JSON.stringify({ message: commitMsg, tree: tree.sha, parents: [currentSha] })
+        });
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(commit) {
+        return fetch(apiBase + '/git/refs/heads/main', {
+          method: 'PATCH', headers: headers,
+          body: JSON.stringify({ sha: commit.sha })
+        });
+      })
+      .then(function(r) {
+        if (!r.ok) return r.json().then(function(j) { throw new Error(j.message || r.statusText); });
+        return r.json();
+      });
   }
 
   function createFile(token, repo, path, content, message) {
