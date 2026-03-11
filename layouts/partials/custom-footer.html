@@ -1037,7 +1037,7 @@ function loadTiptap(callback) {
       return;
     }
 
-    document.getElementById('qe-title').textContent = (lang === 'en' ? 'Editing: \u00ab' : 'Redigerer: \u00ab') + pageTitle + '\u00bb';
+    document.getElementById('qe-title').textContent = (lang === 'en' ? 'Edit page: ' : 'Rediger side: ') + pageTitle;
     var saveBtn = document.getElementById('qe-save-btn');
     saveBtn.disabled = true;
     saveBtn.onclick = null;
