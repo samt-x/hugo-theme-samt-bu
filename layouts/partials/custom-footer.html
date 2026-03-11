@@ -411,20 +411,20 @@ function getDecapToken() {
     var h = { 'Accept': 'application/vnd.github+json' };
     if (token) h['Authorization'] = 'token ' + token;
     var elapsed = 0;
+    var lastAllCompleteAt = 0; // tidspunkt da alle kjente bygg sist ble sett som ferdige
 
     npActivePollTimer = setInterval(function() {
       elapsed += 5;
       var statusEl = document.getElementById('np-build-status-text');
       if (!statusEl) { clearInterval(npActivePollTimer); return; }
 
-      fetch('https://api.github.com/repos/SAMT-X/samt-bu-docs/actions/workflows/hugo.yml/runs?per_page=5', { headers: h })
+      fetch('https://api.github.com/repos/SAMT-X/samt-bu-docs/actions/workflows/hugo.yml/runs?per_page=20', { headers: h })
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (!data.workflow_runs || !data.workflow_runs.length) {
             statusEl.textContent = (npLang === 'en' ? 'Waiting for build to start… (' : 'Bygging av nettstedet starter om litt… (') + elapsed + 's)';
             return;
           }
-          // Vent på ALLE bygg etter startTime (inkl. ensure-uuids-bygg som følger umiddelbart etter)
           var runs = data.workflow_runs.filter(function(r) {
             return new Date(r.created_at).getTime() >= startTime - 30000;
           });
@@ -436,20 +436,21 @@ function getDecapToken() {
             return r.status === 'queued' || r.status === 'in_progress';
           });
           if (anyPending) {
+            lastAllCompleteAt = 0; // aktive bygg – nullstill grace-periode
             statusEl.textContent = (npLang === 'en'
-              ? 'Building site – expected ~1–2 min – ' + elapsed + 's so far'
-              : 'Bygging av nettstedet pågår – forventet ~1–2 min – ' + elapsed + ' sek så langt');
+              ? 'Building site – expected ~1 min – ' + elapsed + 's so far'
+              : 'Bygging av nettstedet pågår – forventet ~1 min – ' + elapsed + ' sek så langt');
             return;
           }
-          // Alle kjente bygg ferdige – men vent på mulig ensure-uuids-bygg (bygg nr. 2)
-          // Nye sider mangler alltid UUID → ensure-uuids committer alltid → 2 hugo.yml-kjøringer forventes
-          if (runs.length < 2 && elapsed < 180) {
+          // Alle kjente bygg ferdige – vent 15 sek for å fange ev. ensure-uuids-bygg
+          if (!lastAllCompleteAt) { lastAllCompleteAt = Date.now(); }
+          if (Date.now() - lastAllCompleteAt < 15000) {
             statusEl.textContent = (npLang === 'en'
-              ? 'Build done, waiting for metadata update… (' + elapsed + 's)'
-              : 'Bygg ferdig, venter på metadata-oppdatering… (' + elapsed + ' sek)');
+              ? 'Build done, verifying… (' + elapsed + 's)'
+              : 'Bygg ferdig, verifiserer… (' + elapsed + ' sek)');
             return;
           }
-          // Alle bygg ferdige (≥2 bygg sett, eller 3-minutters timeout nådd)
+          // 15 sek uten nye aktive bygg → ferdig
           clearInterval(npActivePollTimer);
           npActivePollTimer = null;
           var doneBtn = document.getElementById('np-panel-done');
