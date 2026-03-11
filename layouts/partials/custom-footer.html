@@ -104,16 +104,12 @@ function getDecapToken() {
     }
 
     function createNpEditor() {
-      if (!window.qbtRegistered && window.QuillBetterTable) {
-        Quill.register({'modules/better-table': QuillBetterTable}, true);
-        window.qbtRegistered = true;
-      }
-      npEditorLoaded = true;
-      npEditor = new Quill('#np-body-quill', {
-        theme: 'snow',
-        modules: {
-          'better-table': {},
-          keyboard: window.QuillBetterTable ? { bindings: QuillBetterTable.keyboardBindings } : {},
+      try {
+        if (!window.qbtRegistered && window.QuillBetterTable) {
+          Quill.register({'modules/better-table': QuillBetterTable}, true);
+          window.qbtRegistered = true;
+        }
+        var mods = {
           toolbar: {
             container: [
               ['bold', 'italic'],
@@ -123,15 +119,24 @@ function getDecapToken() {
               ['insertTable']
             ],
             handlers: {
-              insertTable: function() { npEditor.getModule('better-table').insertTable(3, 3); }
+              insertTable: function() {
+                var m = npEditor && npEditor.getModule('better-table');
+                if (m) m.insertTable(3, 3);
+              }
             }
           }
-        }
-      });
-      setTimeout(function() {
-        var btn = document.querySelector('#np-body-quill .ql-toolbar .ql-insertTable');
-        if (btn) { btn.textContent = '⊞'; btn.title = 'Sett inn tabell (3×3)'; }
-      }, 0);
+        };
+        if (window.QuillBetterTable) mods['better-table'] = {};
+        npEditor = new Quill('#np-body-quill', { theme: 'snow', modules: mods });
+        setTimeout(function() {
+          var btn = document.querySelector('#np-overlay .ql-insertTable');
+          if (btn) { btn.textContent = '⊞'; btn.title = 'Sett inn tabell (3×3)'; }
+        }, 0);
+      } catch(e) {
+        console.warn('Quill init feil (np):', e);
+        npEditor = new Quill('#np-body-quill', { theme: 'snow' });
+      }
+      npEditorLoaded = true;
       // Intercepter bilde-lim: lagre som fil, vis data-URL som preview
       npEditor.root.addEventListener('paste', function(e) {
         var items = e.clipboardData && e.clipboardData.items;
@@ -1031,15 +1036,12 @@ function getDecapToken() {
 
     loadLibs(function() {
       if (!qeEditor) {
-        if (!window.qbtRegistered && window.QuillBetterTable) {
-          Quill.register({'modules/better-table': QuillBetterTable}, true);
-          window.qbtRegistered = true;
-        }
-        qeEditor = new Quill('#qe-body-quill', {
-          theme: 'snow',
-          modules: {
-            'better-table': {},
-            keyboard: window.QuillBetterTable ? { bindings: QuillBetterTable.keyboardBindings } : {},
+        try {
+          if (!window.qbtRegistered && window.QuillBetterTable) {
+            Quill.register({'modules/better-table': QuillBetterTable}, true);
+            window.qbtRegistered = true;
+          }
+          var mods = {
             toolbar: {
               container: [
                 ['bold', 'italic'],
@@ -1049,13 +1051,21 @@ function getDecapToken() {
                 ['insertTable']
               ],
               handlers: {
-                insertTable: function() { qeEditor.getModule('better-table').insertTable(3, 3); }
+                insertTable: function() {
+                  var m = qeEditor && qeEditor.getModule('better-table');
+                  if (m) m.insertTable(3, 3);
+                }
               }
             }
-          }
-        });
+          };
+          if (window.QuillBetterTable) mods['better-table'] = {};
+          qeEditor = new Quill('#qe-body-quill', { theme: 'snow', modules: mods });
+        } catch(e) {
+          console.warn('Quill init feil (qe):', e);
+          qeEditor = new Quill('#qe-body-quill', { theme: 'snow' });
+        }
         setTimeout(function() {
-          var btn = document.querySelector('#qe-body-quill .ql-toolbar .ql-insertTable');
+          var btn = document.querySelector('#qe-editor-area .ql-insertTable');
           if (btn) { btn.textContent = '⊞'; btn.title = 'Sett inn tabell (3×3)'; }
         }, 0);
         qeEditor.root.addEventListener('paste', function(e) {
