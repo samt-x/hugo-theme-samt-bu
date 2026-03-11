@@ -857,4 +857,239 @@ function getDecapToken() {
     };
   }
 })();
+
+</script>
+
+<!-- Rediger innhold: Quill WYSIWYG – hent eksisterende side, rediger, lagre til GitHub -->
+<script>
+(function() {
+  var overlay = document.getElementById('qe-overlay');
+  if (!overlay) return;
+
+  var qeRepo = '', qeFilePath = '', qeLang = 'nb', qePageTitle = '', qePermalink = '';
+  var qeFrontmatter = '', qeEditor = null, qePollTimer = null;
+  var qeImages = {}, qeImageMap = {};
+
+  // Lazy-last Quill + Turndown + marked (gjenbruk hvis allerede lastet av np-dialogen)
+  function loadLibs(callback) {
+    function onDone() { callback(); }
+    function loadMarked() {
+      if (window.marked) { onDone(); return; }
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
+      s.onload = onDone; s.onerror = onDone;
+      document.head.appendChild(s);
+    }
+    function loadTurndown() {
+      if (window.TurndownService) { loadMarked(); return; }
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/turndown/dist/turndown.js';
+      s.onload = loadMarked; s.onerror = onDone;
+      document.head.appendChild(s);
+    }
+    function loadQuill() {
+      if (window.Quill) { loadTurndown(); return; }
+      if (!document.getElementById('quill-snow-css')) {
+        var link = document.createElement('link');
+        link.id = 'quill-snow-css'; link.rel = 'stylesheet';
+        link.href = 'https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css';
+        document.head.appendChild(link);
+      }
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js';
+      s.onload = loadTurndown; s.onerror = onDone;
+      document.head.appendChild(s);
+    }
+    loadQuill();
+  }
+
+  function parseFrontmatter(content) {
+    var m = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+    if (m) return { frontmatter: '---\n' + m[1] + '\n---\n', body: m[2].trim() };
+    return { frontmatter: '', body: content.trim() };
+  }
+
+  function setStatus(text) {
+    var el = document.getElementById('qe-status-text');
+    if (el) el.textContent = text;
+  }
+
+  window.openQuillEditDialog = function(repo, filePath, lang, pageTitle, permalink) {
+    qeRepo = repo; qeFilePath = filePath; qeLang = lang || 'nb';
+    qePageTitle = pageTitle; qePermalink = permalink || '';
+    qeImages = {}; qeImageMap = {};
+
+    var token = getDecapToken();
+    if (!token) {
+      alert(lang === 'en'
+        ? 'You must be logged in via Decap CMS before editing.'
+        : 'Du må logge inn via Decap CMS (Endre-menyen) før du kan redigere.');
+      return;
+    }
+
+    document.getElementById('qe-title').textContent = pageTitle;
+    var saveBtn = document.getElementById('qe-save-btn');
+    saveBtn.disabled = true;
+    saveBtn.onclick = null;
+    saveBtn.textContent = lang === 'en' ? 'Save' : 'Lagre';
+    setStatus(lang === 'en' ? 'Loading…' : 'Laster…');
+    overlay.style.display = 'flex';
+
+    loadLibs(function() {
+      if (!qeEditor) {
+        qeEditor = new Quill('#qe-body-quill', {
+          theme: 'snow',
+          modules: { toolbar: [['bold', 'italic'], [{ 'header': [2, 3, false] }],
+            [{ 'list': 'ordered' }, { 'list': 'bullet' }], ['link', 'clean']] }
+        });
+        qeEditor.root.addEventListener('paste', function(e) {
+          var items = e.clipboardData && e.clipboardData.items;
+          if (!items) return;
+          for (var i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+              e.preventDefault(); e.stopPropagation();
+              (function(item) {
+                var ext = item.type === 'image/jpeg' ? 'jpg' : 'png';
+                var fname = 'bilde-' + Date.now() + '.' + ext;
+                var reader = new FileReader();
+                reader.onload = function(evt) {
+                  var dataUrl = evt.target.result;
+                  qeImages[fname] = dataUrl.split(',')[1];
+                  qeImageMap[dataUrl] = fname;
+                  var range = qeEditor.getSelection(true);
+                  qeEditor.insertEmbed(range ? range.index : 0, 'image', dataUrl);
+                  if (range) qeEditor.setSelection(range.index + 1);
+                };
+                reader.readAsDataURL(item.getAsFile());
+              })(items[i]); break;
+            }
+          }
+        }, true);
+      } else {
+        qeEditor.setContents([]);
+      }
+
+      var h = { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github+json' };
+      fetch('https://api.github.com/repos/SAMT-X/' + qeRepo + '/contents/' + qeFilePath, { headers: h })
+        .then(function(r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(function(data) {
+          var raw = decodeURIComponent(escape(atob(data.content.replace(/\n/g, ''))));
+          var parsed = parseFrontmatter(raw);
+          qeFrontmatter = parsed.frontmatter;
+          if (parsed.body && window.marked) {
+            qeEditor.clipboard.dangerouslyPasteHTML(window.marked.parse(parsed.body, { gfm: true }));
+          }
+          setStatus('');
+          saveBtn.disabled = false;
+          qeEditor.focus();
+        })
+        .catch(function(err) { setStatus('Feil ved innlasting: ' + err.message); });
+    });
+  };
+
+  function closeQeDialog() {
+    overlay.style.display = 'none';
+    if (qePollTimer) { clearInterval(qePollTimer); qePollTimer = null; }
+  }
+
+  document.getElementById('qe-cancel-btn').addEventListener('click', closeQeDialog);
+  overlay.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeQeDialog(); e.stopPropagation(); });
+
+  document.getElementById('qe-save-btn').addEventListener('click', function() {
+    var token = getDecapToken();
+    if (!token || !qeEditor) return;
+    var saveBtn = document.getElementById('qe-save-btn');
+    if (saveBtn.onclick) return; // er i "lukk"-modus – la onclick håndtere det
+    saveBtn.disabled = true;
+    saveBtn.textContent = qeLang === 'en' ? 'Saving…' : 'Lagrer…';
+    setStatus('');
+
+    var html = qeEditor.root.innerHTML;
+    Object.keys(qeImageMap).forEach(function(dataUrl) { html = html.split(dataUrl).join(qeImageMap[dataUrl]); });
+    var td = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-' });
+    var body = td.turndown(html).trim();
+    var newContent = qeFrontmatter + body + '\n';
+    var imgDir = qeFilePath.replace('/_index.' + qeLang + '.md', '');
+    var startTime = Date.now();
+    var commitMsg = (qeLang === 'en' ? 'Updated: ' : 'Oppdatert: ') + qePageTitle;
+
+    uploadQeBlobs(token, qeRepo, imgDir, qeImages)
+      .then(function(blobItems) { return createQeCommit(token, qeRepo, qeFilePath, newContent, blobItems, commitMsg); })
+      .then(function() {
+        setStatus(qeLang === 'en' ? 'Saved! Building…' : 'Lagret! Bygger…');
+        saveBtn.disabled = false;
+        saveBtn.textContent = qeLang === 'en' ? 'Save' : 'Lagre';
+        qePollTimer = setInterval(function() { pollQeBuild(startTime, qePollTimer); }, 5000);
+      })
+      .catch(function(err) {
+        setStatus('Feil: ' + err.message);
+        saveBtn.disabled = false;
+        saveBtn.textContent = qeLang === 'en' ? 'Save' : 'Lagre';
+      });
+  });
+
+  function pollQeBuild(startTime, timerRef) {
+    var token = getDecapToken();
+    var h = { 'Accept': 'application/vnd.github+json' };
+    if (token) h['Authorization'] = 'token ' + token;
+    fetch('https://api.github.com/repos/SAMT-X/samt-bu-docs/actions/workflows/hugo.yml/runs?per_page=5', { headers: h })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.workflow_runs) return;
+        var run = null;
+        for (var i = 0; i < data.workflow_runs.length; i++) {
+          if (new Date(data.workflow_runs[i].created_at).getTime() >= startTime - 30000) { run = data.workflow_runs[i]; break; }
+        }
+        if (!run) return;
+        if (run.status === 'queued' || run.status === 'in_progress') {
+          setStatus(qeLang === 'en' ? 'Building site…' : 'Bygger nettstedet…');
+        } else if (run.status === 'completed') {
+          clearInterval(qePollTimer); qePollTimer = null;
+          if (run.conclusion === 'success') {
+            setStatus(qeLang === 'en' ? '✓ Done' : '✓ Ferdig');
+            var saveBtn = document.getElementById('qe-save-btn');
+            saveBtn.textContent = qeLang === 'en' ? 'Close & reload ↗' : 'Lukk og last inn ↗';
+            saveBtn.onclick = function() { window.location.href = qePermalink + '?_=' + Date.now(); };
+          } else {
+            setStatus('⚠ ' + run.conclusion);
+          }
+        }
+      })
+      .catch(function() {});
+  }
+
+  function uploadQeBlobs(token, repo, dirPath, images) {
+    var names = Object.keys(images);
+    if (!names.length) return Promise.resolve([]);
+    var apiBase = 'https://api.github.com/repos/SAMT-X/' + repo;
+    var h = { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' };
+    return Promise.all(names.map(function(fname) {
+      return fetch(apiBase + '/git/blobs', { method: 'POST', headers: h, body: JSON.stringify({ content: images[fname], encoding: 'base64' }) })
+        .then(function(r) { return r.json(); })
+        .then(function(blob) { return { path: dirPath + '/' + fname, mode: '100644', type: 'blob', sha: blob.sha }; });
+    }));
+  }
+
+  function createQeCommit(token, repo, filePath, content, blobItems, message) {
+    var apiBase = 'https://api.github.com/repos/SAMT-X/' + repo;
+    var h = { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' };
+    var headSha;
+    return fetch(apiBase + '/git/ref/heads/main', { headers: h })
+      .then(function(r) { return r.json(); })
+      .then(function(ref) { headSha = ref.object.sha; return fetch(apiBase + '/git/commits/' + headSha, { headers: h }); })
+      .then(function(r) { return r.json(); })
+      .then(function(commit) {
+        var items = [{ path: filePath, mode: '100644', type: 'blob', content: content }].concat(blobItems || []);
+        return fetch(apiBase + '/git/trees', { method: 'POST', headers: h, body: JSON.stringify({ base_tree: commit.tree.sha, tree: items }) });
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(tree) { return fetch(apiBase + '/git/commits', { method: 'POST', headers: h, body: JSON.stringify({ message: message, tree: tree.sha, parents: [headSha] }) }); })
+      .then(function(r) { return r.json(); })
+      .then(function(commit) { return fetch(apiBase + '/git/refs/heads/main', { method: 'PATCH', headers: h, body: JSON.stringify({ sha: commit.sha }) }); })
+      .then(function(r) {
+        if (!r.ok) return r.json().then(function(j) { throw new Error(j.message || r.statusText); });
+        return r.json();
+      });
+  }
+})();
 </script>
