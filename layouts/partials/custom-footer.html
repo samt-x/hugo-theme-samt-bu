@@ -86,10 +86,10 @@ function getDecapToken() {
     if (npEditorLoaded) { if (npEditor) npEditor.setMarkdown(''); callback(); return; }
     var link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = 'https://cdn.jsdelivr.net/npm/@toast-ui/editor@3.2.2/dist/toastui-editor.min.css';
+    link.href = 'https://uicdn.toast.com/editor/latest/toastui-editor.min.css';
     document.head.appendChild(link);
     var script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/@toast-ui/editor@3.2.2/dist/toastui-editor-all.min.js';
+    script.src = 'https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js';
     script.onload = function() {
       npEditorLoaded = true;
       setTimeout(function() {
