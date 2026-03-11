@@ -1,16 +1,9 @@
-{{/* Edit switcher: dropdown for å redigere gjeldende side i Decap CMS eller gå til CMS-oversikt.
-     «Denne siden»/«This page» → deep-link til gjeldende side i riktig portal.
-     «Andre valg»/«Other options» → CMS-oversikt.
-     Modul-sider (teams/team-architecture/*, utkast/*) peker til sine egne portaler og collections.
-     Entry-slug er full relativ sti inkl. /_index-suffiks (f.eks. "kommuneforlaget/_index").
-     Rot-sider i moduler bruker "_index" som slug; docs-root forblir deaktivert (tom slug). */}}
+{{/* Edit switcher: dropdown for å redigere gjeldende side (WYSIWYG), opprette ny side, slette, osv.
+     Modul-sider (teams/*, utkast/*, loesninger/cms-loesninger/samt-bu-docs/*) peker til riktig repo.
+     Rot-sider i moduler er redigerbare; docs-rot forblir deaktivert (tom entrySlug). */}}
 {{ $lang := .Site.Language.Lang }}
 {{ $entrySlug := "" }}
-{{ $collection := "docs" }}
-{{ $portalPath := cond (eq $lang "en") "edit/docs-en/" "edit/docs-nb/" }}
-{{ $overviewPath := cond (eq $lang "en") "edit/en/" "edit/" }}
 {{ $githubRepo := "samt-bu-docs" }}
-{{ $addChildURL := "" }}
 {{ $dirPath := "" }}
 {{ $parentUrl := "/" | relURL }}
 {{ with .Parent }}{{ $parentUrl = .RelPermalink }}{{ end }}
@@ -47,8 +40,6 @@
   {{ if hasPrefix $dir "teams/" }}
     {{/* team-architecture modul */}}
     {{ $isModulePage = true }}
-    {{ $collection = "arkitektur" }}
-    {{ $portalPath = cond (eq $lang "en") "edit/arkitektur-en/" "edit/arkitektur-nb/" }}
     {{ $rel = strings.TrimPrefix "teams/team-architecture" $dir }}
     {{ $rel = strings.TrimPrefix "/" $rel }}
     {{ $githubRepo = "team-architecture" }}
@@ -56,8 +47,6 @@
   {{ else if or (eq $dir "utkast") (hasPrefix $dir "utkast/") }}
     {{/* samt-bu-drafts modul */}}
     {{ $isModulePage = true }}
-    {{ $collection = "utkast" }}
-    {{ $portalPath = cond (eq $lang "en") "edit/utkast-en/" "edit/utkast-nb/" }}
     {{ $rel = strings.TrimPrefix "utkast" $dir }}
     {{ $rel = strings.TrimPrefix "/" $rel }}
     {{ $githubRepo = "samt-bu-drafts" }}
@@ -65,8 +54,6 @@
   {{ else if or (eq $dir "loesninger/cms-loesninger/samt-bu-docs") (hasPrefix $dir "loesninger/cms-loesninger/samt-bu-docs/") }}
     {{/* solution-samt-bu-docs modul */}}
     {{ $isModulePage = true }}
-    {{ $collection = "loesninger" }}
-    {{ $portalPath = cond (eq $lang "en") "edit/loesninger-en/" "edit/loesninger-nb/" }}
     {{ $rel = strings.TrimPrefix "loesninger/cms-loesninger/samt-bu-docs" $dir }}
     {{ $rel = strings.TrimPrefix "/" $rel }}
     {{ $githubRepo = "solution-samt-bu-docs" }}
@@ -86,11 +73,7 @@
     {{ $entrySlug = printf "%s/_index" $rel }}
   {{ end }}
 
-  {{/* GitHub «create file»-URL for å opprette nytt underkapittel.
-       Stien peker på gjeldende mappe; ?filename= forhåndsutfyller
-       mappestruktur i filnavnfeltet. Brukeren bytter «nytt-kapittel». */}}
   {{ $dirPath = cond (eq $rel "") "content" (printf "content/%s" $rel) }}
-  {{ $addChildURL = printf "https://github.com/SAMT-X/%s/new/main/%s/?filename=nytt-kapittel/_index.nb.md" $githubRepo $dirPath }}
 {{ end }}
 
 {{/* Variabler for «Side – samme nivå»-dialogen */}}
@@ -126,10 +109,6 @@
   {{ end }}
 {{ end }}
 
-{{ $portalURL := $portalPath | relURL }}
-{{ $overviewURL := $overviewPath | relURL }}
-{{ $pageEditURL := printf "%s#/collections/%s/entries/%s" $portalURL $collection $entrySlug }}
-
 <div class="tema-switcher">
   <div class="tema-switcher-toggle" id="edit-toggle">
     <span class="tema-active">{{ i18n "editSwitcherLabel" | default (cond (eq $lang "en") "Edit" "Endre") }}</span>
@@ -142,19 +121,6 @@
         <i class="fa fa-pencil"></i>
         <span>{{ cond (eq $lang "en") "Edit content" "Rediger innhold" }}</span>
       </a>
-    </li>
-    <li>
-      <a href="{{ $pageEditURL }}">
-        <i class="fa fa-file-text-o"></i>
-        <span>{{ i18n "editSwitcherPage" | default (cond (eq $lang "en") "This page (Decap)" "Denne siden (Decap)") }}</span>
-      </a>
-    </li>
-    {{ else }}
-    <li class="disabled">
-      <span class="tema-disabled-item">
-        <i class="fa fa-file-text-o"></i>
-        {{ i18n "editSwitcherPage" | default (cond (eq $lang "en") "This page" "Denne siden") }}
-      </span>
     </li>
     {{ end }}
     {{ if and .File (ne $addSiblingURL "") }}
@@ -173,12 +139,6 @@
       </a>
     </li>
     {{ end }}
-    <li>
-      <a href="{{ $overviewURL }}">
-        <i class="fa fa-list"></i>
-        <span>{{ i18n "editSwitcherOther" | default (cond (eq $lang "en") "Other options" "Andre valg") }}</span>
-      </a>
-    </li>
     {{ if and .File (ne $entrySlug "") (ne $dirPath "content") }}
     <li style="border-top:1px solid #f5e0e0; margin-top:3px; padding-top:3px;">
       <a href="#" onclick="openDeleteDialog('{{ $githubRepo }}', '{{ $dirPath }}', '{{ $lang }}', {{ .Title | jsonify }}, '{{ $afterDeleteUrl }}'); return false;" style="color:#b00020;">
