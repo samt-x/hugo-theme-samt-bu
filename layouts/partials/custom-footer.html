@@ -90,61 +90,106 @@ function getDecapToken() {
       npImages = {}; npImageMap = {};
       callback(); return;
     }
-    var link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css';
-    document.head.appendChild(link);
-    var s1 = document.createElement('script');
-    s1.src = 'https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js';
-    s1.onload = function() {
-      var s2 = document.createElement('script');
-      s2.src = 'https://cdn.jsdelivr.net/npm/turndown/dist/turndown.js';
-      s2.onload = function() {
-        npEditorLoaded = true;
-        npEditor = new Quill('#np-body-quill', {
-          theme: 'snow',
-          modules: {
-            toolbar: [
+    if (!document.getElementById('quill-snow-css')) {
+      var cssQ = document.createElement('link');
+      cssQ.id = 'quill-snow-css'; cssQ.rel = 'stylesheet';
+      cssQ.href = 'https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css';
+      document.head.appendChild(cssQ);
+    }
+    if (!document.getElementById('qbt-css')) {
+      var cssT = document.createElement('link');
+      cssT.id = 'qbt-css'; cssT.rel = 'stylesheet';
+      cssT.href = 'https://cdn.jsdelivr.net/npm/quill-better-table@1.2.10/dist/quill-better-table.css';
+      document.head.appendChild(cssT);
+    }
+
+    function createNpEditor() {
+      if (!window.qbtRegistered && window.QuillBetterTable) {
+        Quill.register({'modules/better-table': QuillBetterTable}, true);
+        window.qbtRegistered = true;
+      }
+      npEditorLoaded = true;
+      npEditor = new Quill('#np-body-quill', {
+        theme: 'snow',
+        modules: {
+          'better-table': {},
+          keyboard: window.QuillBetterTable ? { bindings: QuillBetterTable.keyboardBindings } : {},
+          toolbar: {
+            container: [
               ['bold', 'italic'],
               [{ 'header': [2, 3, false] }],
               [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-              ['link', 'clean']
-            ]
-          }
-        });
-        // Intercepter bilde-lim: lagre som fil, vis data-URL som preview
-        npEditor.root.addEventListener('paste', function(e) {
-          var items = e.clipboardData && e.clipboardData.items;
-          if (!items) return;
-          for (var i = 0; i < items.length; i++) {
-            if (items[i].type.indexOf('image') !== -1) {
-              e.preventDefault();
-              e.stopPropagation();
-              (function(item) {
-                var ext = item.type === 'image/jpeg' ? 'jpg' : 'png';
-                var filename = 'bilde-' + Date.now() + '.' + ext;
-                var reader = new FileReader();
-                reader.onload = function(evt) {
-                  var dataUrl = evt.target.result;
-                  npImages[filename] = dataUrl.split(',')[1];
-                  npImageMap[dataUrl] = filename;
-                  var range = npEditor.getSelection(true);
-                  npEditor.insertEmbed(range ? range.index : 0, 'image', dataUrl);
-                  if (range) npEditor.setSelection(range.index + 1);
-                };
-                reader.readAsDataURL(item.getAsFile());
-              })(items[i]);
-              break;
+              ['link', 'clean'],
+              ['insertTable']
+            ],
+            handlers: {
+              insertTable: function() { npEditor.getModule('better-table').insertTable(3, 3); }
             }
           }
-        }, true);
-        callback();
-      };
-      s2.onerror = function() { npEditorLoaded = true; callback(); };
-      document.head.appendChild(s2);
-    };
-    s1.onerror = function() { npEditorLoaded = true; callback(); };
-    document.head.appendChild(s1);
+        }
+      });
+      setTimeout(function() {
+        var btn = document.querySelector('#np-body-quill .ql-toolbar .ql-insertTable');
+        if (btn) { btn.textContent = '⊞'; btn.title = 'Sett inn tabell (3×3)'; }
+      }, 0);
+      // Intercepter bilde-lim: lagre som fil, vis data-URL som preview
+      npEditor.root.addEventListener('paste', function(e) {
+        var items = e.clipboardData && e.clipboardData.items;
+        if (!items) return;
+        for (var i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf('image') !== -1) {
+            e.preventDefault();
+            e.stopPropagation();
+            (function(item) {
+              var ext = item.type === 'image/jpeg' ? 'jpg' : 'png';
+              var filename = 'bilde-' + Date.now() + '.' + ext;
+              var reader = new FileReader();
+              reader.onload = function(evt) {
+                var dataUrl = evt.target.result;
+                npImages[filename] = dataUrl.split(',')[1];
+                npImageMap[dataUrl] = filename;
+                var range = npEditor.getSelection(true);
+                npEditor.insertEmbed(range ? range.index : 0, 'image', dataUrl);
+                if (range) npEditor.setSelection(range.index + 1);
+              };
+              reader.readAsDataURL(item.getAsFile());
+            })(items[i]);
+            break;
+          }
+        }
+      }, true);
+      callback();
+    }
+
+    function loadTurndown() {
+      function loadGfm() {
+        if (window.turndownPluginGfm) { createNpEditor(); return; }
+        var s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/turndown-plugin-gfm/dist/turndown-plugin-gfm.js';
+        s.onload = createNpEditor; s.onerror = createNpEditor;
+        document.head.appendChild(s);
+      }
+      if (window.TurndownService) { loadGfm(); return; }
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/turndown/dist/turndown.js';
+      s.onload = loadGfm; s.onerror = createNpEditor;
+      document.head.appendChild(s);
+    }
+    function loadQBT() {
+      if (window.QuillBetterTable) { loadTurndown(); return; }
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/quill-better-table@1.2.10/dist/quill-better-table.js';
+      s.onload = loadTurndown; s.onerror = loadTurndown;
+      document.head.appendChild(s);
+    }
+    function loadQuill() {
+      if (window.Quill) { loadQBT(); return; }
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js';
+      s.onload = loadQBT; s.onerror = function() { npEditorLoaded = true; callback(); };
+      document.head.appendChild(s);
+    }
+    loadQuill();
   }
 
   function quillToMarkdown() {
@@ -155,6 +200,7 @@ function getDecapToken() {
       html = html.split(dataUrl).join(npImageMap[dataUrl]);
     });
     var td = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-' });
+    if (window.turndownPluginGfm) td.use(window.turndownPluginGfm.tables);
     return td.turndown(html).trim();
   }
 
@@ -870,7 +916,7 @@ function getDecapToken() {
   var qeFrontmatter = '', qeEditor = null, qePollTimer = null;
   var qeImages = {}, qeImageMap = {};
 
-  // Lazy-last Quill + Turndown + marked (gjenbruk hvis allerede lastet av np-dialogen)
+  // Lazy-last Quill + quill-better-table + Turndown + marked (gjenbruk hvis allerede lastet)
   function loadLibs(callback) {
     function onDone() { callback(); }
     function loadMarked() {
@@ -881,23 +927,43 @@ function getDecapToken() {
       document.head.appendChild(s);
     }
     function loadTurndown() {
-      if (window.TurndownService) { loadMarked(); return; }
+      function loadGfm() {
+        if (window.turndownPluginGfm) { loadMarked(); return; }
+        var s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/turndown-plugin-gfm/dist/turndown-plugin-gfm.js';
+        s.onload = loadMarked; s.onerror = loadMarked;
+        document.head.appendChild(s);
+      }
+      if (window.TurndownService) { loadGfm(); return; }
       var s = document.createElement('script');
       s.src = 'https://cdn.jsdelivr.net/npm/turndown/dist/turndown.js';
-      s.onload = loadMarked; s.onerror = onDone;
+      s.onload = loadGfm; s.onerror = onDone;
+      document.head.appendChild(s);
+    }
+    function loadQBT() {
+      if (window.QuillBetterTable) { loadTurndown(); return; }
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/quill-better-table@1.2.10/dist/quill-better-table.js';
+      s.onload = loadTurndown; s.onerror = loadTurndown;
       document.head.appendChild(s);
     }
     function loadQuill() {
-      if (window.Quill) { loadTurndown(); return; }
+      if (window.Quill) { loadQBT(); return; }
       if (!document.getElementById('quill-snow-css')) {
-        var link = document.createElement('link');
-        link.id = 'quill-snow-css'; link.rel = 'stylesheet';
-        link.href = 'https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css';
-        document.head.appendChild(link);
+        var cssQ = document.createElement('link');
+        cssQ.id = 'quill-snow-css'; cssQ.rel = 'stylesheet';
+        cssQ.href = 'https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css';
+        document.head.appendChild(cssQ);
+      }
+      if (!document.getElementById('qbt-css')) {
+        var cssT = document.createElement('link');
+        cssT.id = 'qbt-css'; cssT.rel = 'stylesheet';
+        cssT.href = 'https://cdn.jsdelivr.net/npm/quill-better-table@1.2.10/dist/quill-better-table.css';
+        document.head.appendChild(cssT);
       }
       var s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js';
-      s.onload = loadTurndown; s.onerror = onDone;
+      s.src = 'https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js';
+      s.onload = loadQBT; s.onerror = onDone;
       document.head.appendChild(s);
     }
     loadQuill();
@@ -965,11 +1031,33 @@ function getDecapToken() {
 
     loadLibs(function() {
       if (!qeEditor) {
+        if (!window.qbtRegistered && window.QuillBetterTable) {
+          Quill.register({'modules/better-table': QuillBetterTable}, true);
+          window.qbtRegistered = true;
+        }
         qeEditor = new Quill('#qe-body-quill', {
           theme: 'snow',
-          modules: { toolbar: [['bold', 'italic'], [{ 'header': [2, 3, false] }],
-            [{ 'list': 'ordered' }, { 'list': 'bullet' }], ['link', 'clean']] }
+          modules: {
+            'better-table': {},
+            keyboard: window.QuillBetterTable ? { bindings: QuillBetterTable.keyboardBindings } : {},
+            toolbar: {
+              container: [
+                ['bold', 'italic'],
+                [{ 'header': [2, 3, false] }],
+                [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                ['link', 'clean'],
+                ['insertTable']
+              ],
+              handlers: {
+                insertTable: function() { qeEditor.getModule('better-table').insertTable(3, 3); }
+              }
+            }
+          }
         });
+        setTimeout(function() {
+          var btn = document.querySelector('#qe-body-quill .ql-toolbar .ql-insertTable');
+          if (btn) { btn.textContent = '⊞'; btn.title = 'Sett inn tabell (3×3)'; }
+        }, 0);
         qeEditor.root.addEventListener('paste', function(e) {
           var items = e.clipboardData && e.clipboardData.items;
           if (!items) return;
@@ -1053,6 +1141,7 @@ function getDecapToken() {
     var html = qeEditor.root.innerHTML;
     Object.keys(qeImageMap).forEach(function(dataUrl) { html = html.split(dataUrl).join(qeImageMap[dataUrl]); });
     var td = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-' });
+    if (window.turndownPluginGfm) td.use(window.turndownPluginGfm.tables);
     var body = td.turndown(html).trim();
 
     // Bygg frontmatter fra skjemafeltene
