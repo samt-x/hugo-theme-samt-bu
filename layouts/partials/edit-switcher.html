@@ -134,7 +134,7 @@
     {{ if and .File (ne $dirPath "content") }}
     <li>
       <a href="#" onclick="openNewChildDialog('{{ $githubRepo }}', '{{ $dirPath }}', '{{ $lang }}', '{{ .RelPermalink }}'); return false;">
-        <i class="fa fa-plus"></i>
+        <i class="fa fa-folder-o"></i>
         <span>{{ i18n "editSwitcherAddChild" | default (cond (eq $lang "en") "New sub-chapter" "Nytt underkapittel") }}</span>
       </a>
     </li>
