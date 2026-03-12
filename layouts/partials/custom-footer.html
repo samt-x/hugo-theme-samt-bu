@@ -98,6 +98,38 @@ function fetchCurrentUser(callback) {
     .catch(function() { callback(null); });
 }
 
+// Persistent bygg-sporing på tvers av sidenavigering (localStorage)
+var SAMTU_PENDING_KEY = 'samtu-build-pending';
+function samtuGetPending() {
+  try { return JSON.parse(localStorage.getItem(SAMTU_PENDING_KEY)); } catch(e) { return null; }
+}
+function samtuIncrementPending() {
+  var p = samtuGetPending() || { count: 0 };
+  try { localStorage.setItem(SAMTU_PENDING_KEY, JSON.stringify({ count: (p.count || 0) + 1, lastSaveAt: Date.now() })); } catch(e) {}
+}
+function samtuClearPending() {
+  try { localStorage.removeItem(SAMTU_PENDING_KEY); } catch(e) {}
+}
+function samtuShowPendingIndicator(count) {
+  var ind = document.getElementById('qe-job-indicator');
+  if (!ind) return;
+  var isEn = document.documentElement.lang === 'en';
+  var label = count === 1
+    ? (isEn ? '1 change building\u2026' : '1 endring bygges\u2026')
+    : (isEn ? count + ' changes building\u2026' : count + ' endringer bygges\u2026');
+  ind.innerHTML = '<i class="fa fa-spinner fa-spin" style="font-size:12px; opacity:.85;"></i><span style="margin-left:7px;">' + label + '</span>';
+  ind.style.display = 'flex';
+}
+function samtuShowDoneIndicator() {
+  var ind = document.getElementById('qe-job-indicator');
+  if (!ind) return;
+  var isEn = document.documentElement.lang === 'en';
+  var url = window.location.href.split('?')[0] + '?_=' + Date.now();
+  var label = isEn ? 'Changes published \u2013 click to reload' : 'Endringer publisert \u2013 klikk for \u00e5 laste inn';
+  ind.innerHTML = '<a href="' + url + '" style="color:#9de; display:flex; align-items:center; gap:7px; text-decoration:none;"><i class="fa fa-check-circle" style="font-size:12px;"></i><span>' + label + '</span></a>';
+  ind.style.display = 'flex';
+}
+
 // Poll GitHub Actions workflow – brukes for rediger og slett (2s intervall)
 function startGhPoll(startTime, onDone, onError, onStatus) {
   var token = getStoredToken();
@@ -181,6 +213,14 @@ function loadTiptap(callback) {
 
 // Pre-hent GitHub-brukernavn hvis innlogget (popuperer cache for bruk ved lagring)
 if (getStoredToken() && !localStorage.getItem('samt-bu-gh-user')) fetchCurrentUser(function() {});
+
+// Gjenopprett pending-spinner ved sideinnlasting (f.eks. etter navigering)
+setTimeout(function() {
+  var p = samtuGetPending();
+  if (!p || !p.count || !p.lastSaveAt) return;
+  if ((Date.now() - p.lastSaveAt) > 600000) { samtuClearPending(); return; } // > 10 min – anta ferdig
+  samtuShowPendingIndicator(p.count);
+}, 200);
 </script>
 
 <!-- Language switcher toggle -->
@@ -1239,6 +1279,7 @@ if (getStoredToken() && !localStorage.getItem('samt-bu-gh-user')) fetchCurrentUs
         if (cancelBtn) cancelBtn.textContent = qeLang === 'en' ? 'Close this window' : 'Lukk dette vinduet';
         var w = document.getElementById('qe-build-warning');
         if (w) w.style.display = 'none';
+        samtuIncrementPending();
         pollQeBuild(startTime, qeOldEtag);
       })
       .catch(function(err) {
@@ -1264,7 +1305,7 @@ if (getStoredToken() && !localStorage.getItem('samt-bu-gh-user')) fetchCurrentUs
 
     function onBuildDone() {
       clearInterval(qePollTimer); qePollTimer = null;
-      var ind = document.getElementById('qe-job-indicator');
+      samtuClearPending();
       if (overlay.style.display !== 'none') {
         // Dialog er åpen: tell ned og last inn automatisk
         var secs = 2;
@@ -1280,9 +1321,7 @@ if (getStoredToken() && !localStorage.getItem('samt-bu-gh-user')) fetchCurrentUs
         var navTimer = setTimeout(doNav, secs * 1000);
       } else {
         // Dialog er lukket: erstatt spinner med klikkbar lenke
-        if (ind) {
-          ind.innerHTML = '<a href="' + url + '?_=' + Date.now() + '" style="color:#9de; display:flex; align-items:center; gap:7px; text-decoration:none;"><i class="fa fa-check-circle" style="font-size:12px;"></i><span>' + (lang === 'en' ? 'Changes published \u2013 click to reload' : 'Endringer publisert \u2013 klikk for \u00e5 laste inn') + '</span></a>';
-        }
+        samtuShowDoneIndicator();
       }
     }
 
@@ -1372,10 +1411,20 @@ if (getStoredToken() && !localStorage.getItem('samt-bu-gh-user')) fetchCurrentUs
       .then(function(r) {
         var newEtag = r.headers.get('etag') || r.headers.get('last-modified');
         if (newEtag && newEtag !== knownEtag) {
+          var p = samtuGetPending();
+          var tooSoon = p && p.count && p.lastSaveAt && (Date.now() - p.lastSaveAt) < 60000;
+          if (tooSoon) return; // for tidlig – bygg inkluderer kanskje ikke siste endring ennå
           knownEtag = newEtag;
           clearInterval(bgTimer);
-          var banner = document.getElementById('page-update-banner');
-          if (banner) banner.style.display = 'flex';
+          if (p && p.count) {
+            // Egne ventende endringer – vis «ferdig»-indikator
+            samtuClearPending();
+            samtuShowDoneIndicator();
+          } else {
+            // Andres endring – vis generelt oppdateringsbanner
+            var banner = document.getElementById('page-update-banner');
+            if (banner) banner.style.display = 'flex';
+          }
         }
       })
       .catch(function() {});
