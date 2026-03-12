@@ -848,41 +848,52 @@ function loadTiptap(callback) {
 
   function pollBuild(startTime) {
     var lang = delLang;
+    var pageUrl = window.location.href.split('?')[0];
+    var attempts = 0;
+
     document.getElementById('del-panel-done').onclick = function() {
       clearInterval(activePollTimer); activePollTimer = null;
       hideJobIndicator();
       navAfterDelete();
     };
-    activePollTimer = startGhPoll(startTime,
-      function onDone() {
+
+    function onDone() {
+      clearInterval(activePollTimer); activePollTimer = null;
+      hideJobIndicator();
+      var doneBtn = document.getElementById('del-panel-done');
+      if (doneBtn) doneBtn.style.display = 'inline-block';
+      var secs = 3;
+      var statusEl = document.getElementById('del-build-status-text');
+      if (statusEl) statusEl.textContent = (lang === 'en' ? '✓ Done! Navigating in ' : '✓ Ferdig! Navigerer om ') + secs + (lang === 'en' ? 's…' : ' sek…');
+      var cdTimer = setInterval(function() {
+        secs--;
+        if (secs <= 0) { clearInterval(cdTimer); navAfterDelete(); return; }
+        var el = document.getElementById('del-build-status-text');
+        if (el) el.textContent = (lang === 'en' ? '✓ Done! Navigating in ' : '✓ Ferdig! Navigerer om ') + secs + (lang === 'en' ? 's…' : ' sek…');
+      }, 1000);
+    }
+
+    // Poll nåværende side-URL – vent på 404 (siden forsvinner fra CF CDN)
+    activePollTimer = setInterval(function() {
+      if (++attempts > 120) {
         clearInterval(activePollTimer); activePollTimer = null;
-        hideJobIndicator();
+        var statusEl = document.getElementById('del-build-status-text');
+        if (statusEl) statusEl.textContent = '⚠ ' + (lang === 'en' ? 'Timed out' : 'Tidsavbrudd');
         var doneBtn = document.getElementById('del-panel-done');
         if (doneBtn) doneBtn.style.display = 'inline-block';
-        var secs = 3;
-        var statusEl = document.getElementById('del-build-status-text');
-        if (statusEl) statusEl.textContent = (lang === 'en' ? '✓ Done! Navigating in ' : '✓ Ferdig! Navigerer om ') + secs + (lang === 'en' ? 's…' : ' sek…');
-        var cdTimer = setInterval(function() {
-          secs--;
-          if (secs <= 0) { clearInterval(cdTimer); navAfterDelete(); return; }
-          var el = document.getElementById('del-build-status-text');
-          if (el) el.textContent = (lang === 'en' ? '✓ Done! Navigating in ' : '✓ Ferdig! Navigerer om ') + secs + (lang === 'en' ? 's…' : ' sek…');
-        }, 1000);
-      },
-      function onError(reason) {
-        clearInterval(activePollTimer); activePollTimer = null;
-        hideJobIndicator();
-        var statusEl = document.getElementById('del-build-status-text');
-        if (statusEl) statusEl.textContent = (lang === 'en' ? '⚠ Build ended: ' : '⚠ Bygg avsluttet: ') + reason;
-        var doneBtn = document.getElementById('del-panel-done');
-        if (doneBtn) doneBtn.style.display = 'inline-block';
-      },
-      function onStatus() {
-        var elapsed = Math.round((Date.now() - startTime) / 1000);
-        var statusEl = document.getElementById('del-build-status-text');
-        if (statusEl) statusEl.textContent = lang === 'en' ? 'Updating site (' + elapsed + 's)…' : 'Nettsted oppdateres (' + elapsed + ' sek)…';
+        return;
       }
-    );
+      fetch(pageUrl + '?_cf=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
+        .then(function(r) {
+          if (r.status === 404) {
+            onDone();
+          } else {
+            var statusEl = document.getElementById('del-build-status-text');
+            if (statusEl) statusEl.textContent = lang === 'en' ? 'Updating site (' + attempts + 's)…' : 'Nettsted oppdateres (' + attempts + ' sek)…';
+          }
+        })
+        .catch(function() {});
+    }, 1000);
   }
 })();
 
