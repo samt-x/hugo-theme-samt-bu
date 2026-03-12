@@ -1325,23 +1325,21 @@ setTimeout(function() {
           .then(function(commits) {
             var login = commits && commits[0] && commits[0].author && commits[0].author.login;
             var isHuman = login && login !== 'github-actions[bot]';
-            if (isHuman) {
-              // Ekte konflikt – vis feilmelding og "Prøv igjen"-knapp
-              saveBtn.disabled = false;
-              saveBtn.style.background = '';
-              saveBtn.style.cursor = '';
-              saveBtn.textContent = qeLang === 'en' ? 'Retry' : 'Prøv igjen';
-              setStatus('⚠ ' + (qeLang === 'en' ? 'Conflict: page changed by @' + login + '. Try again.' : 'Konflikt: siden ble endret av @' + login + '. Prøv igjen.'));
-            } else {
-              // Bot-commit / repo-kø – prøv igjen automatisk uten å forstyrre brukeren
-              setStatus(qeLang === 'en' ? 'Retrying…' : 'Prøver igjen…');
-              setTimeout(function() { saveBtn.click(); }, 3000);
-            }
+            var msg = isHuman
+              ? (qeLang === 'en' ? 'Conflict: page changed by @' + login + '. Try again.' : 'Konflikt: siden ble endret av @' + login + '. Prøv igjen.')
+              : (qeLang === 'en' ? 'Save failed. Try again.' : 'Lagring feilet. Prøv igjen.');
+            saveBtn.disabled = false;
+            saveBtn.style.background = '';
+            saveBtn.style.cursor = '';
+            saveBtn.textContent = qeLang === 'en' ? 'Retry' : 'Prøv igjen';
+            setStatus('⚠ ' + msg);
           })
           .catch(function() {
-            // Kan ikke avgjøre årsak – auto-retry
-            setStatus(qeLang === 'en' ? 'Retrying…' : 'Prøver igjen…');
-            setTimeout(function() { saveBtn.click(); }, 3000);
+            saveBtn.disabled = false;
+            saveBtn.style.background = '';
+            saveBtn.style.cursor = '';
+            saveBtn.textContent = qeLang === 'en' ? 'Retry' : 'Prøv igjen';
+            setStatus('⚠ ' + (qeLang === 'en' ? 'Save failed. Try again.' : 'Lagring feilet. Prøv igjen.'));
           });
       });
   });
