@@ -95,7 +95,7 @@ function startUrlPoll(url, onDone, onError, onStatus) {
           { method: 'HEAD', cache: 'no-store' })
       .then(function(r) {
         if (r.ok) onDone();
-        else onStatus('Venter på deploy…');
+        else onStatus(attempts);
       })
       .catch(function() { onStatus('Venter…'); });
   }, 1000);
@@ -690,7 +690,7 @@ function loadTiptap(callback) {
         hideNpJobIndicator();
         setNpStatus((lang === 'en' ? '⚠ Timed out: ' : '⚠ Tidsavbrudd: ') + reason);
       },
-      function onStatus(msg) { setNpStatus(msg); }
+      function onStatus(secs) { setNpStatus(lang === 'en' ? 'Updating site (' + secs + 's)…' : 'Nettsted oppdateres (' + secs + ' sek)…'); }
     );
   }
 
@@ -1137,7 +1137,7 @@ function loadTiptap(callback) {
     uploadQeBlobs(token, qeRepo, imgDir, qeImages)
       .then(function(blobItems) { return createQeCommit(token, qeRepo, qeFilePath, newContent, blobItems, commitMsg); })
       .then(function() {
-        setStatus(qeLang === 'en' ? 'Saved! Waiting for deploy…' : 'Lagret! Venter på deploy…');
+        setStatus(qeLang === 'en' ? 'Saved! Updating site…' : 'Lagret! Nettstedet oppdateres…');
         saveBtn.disabled = true;
         saveBtn.textContent = qeLang === 'en' ? 'Saved' : 'Lagret';
         saveBtn.style.background = '#888';
@@ -1181,7 +1181,7 @@ function loadTiptap(callback) {
           .then(function(r) {
             var newEtag = r.headers.get('etag') || r.headers.get('last-modified');
             if (r.ok && newEtag && newEtag !== oldEtag) onBuildDone();
-            else setStatus(lang === 'en' ? 'Waiting for deploy…' : 'Venter på deploy…');
+            else setStatus(lang === 'en' ? 'Updating site (' + attempts + 's)…' : 'Nettsted oppdateres (' + attempts + ' sek)…');
           })
           .catch(function() { setStatus('Venter…'); });
       }, 1000);
