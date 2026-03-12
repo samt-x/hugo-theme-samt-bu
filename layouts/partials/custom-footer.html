@@ -98,7 +98,7 @@ function startUrlPoll(url, onDone, onError, onStatus) {
         else onStatus('Venter på deploy…');
       })
       .catch(function() { onStatus('Venter…'); });
-  }, 3000);
+  }, 1000);
 }
 
 // TipTap lazy-laster (delt av np-dialog og qe-dialog)
@@ -1176,7 +1176,7 @@ function loadTiptap(callback) {
             else setStatus(lang === 'en' ? 'Waiting for deploy…' : 'Venter på deploy…');
           })
           .catch(function() { setStatus('Venter…'); });
-      }, 3000);
+      }, 1000);
     } else {
       // Fallback: GitHub Actions API (2s intervall)
       qePollTimer = startGhPoll(startTime,
