@@ -1309,15 +1309,15 @@ setTimeout(function() {
         pollQeBuild(startTime, qeOldEtag);
       })
       .catch(function(err) {
-        saveBtn.disabled = false;
-        saveBtn.style.background = '';
-        saveBtn.style.cursor = '';
-        saveBtn.textContent = qeLang === 'en' ? 'Retry' : 'Prøv igjen';
         if (err.message !== 'Update is not a fast forward') {
+          saveBtn.disabled = false;
+          saveBtn.style.background = '';
+          saveBtn.style.cursor = '';
+          saveBtn.textContent = qeLang === 'en' ? 'Retry' : 'Prøv igjen';
           setStatus('⚠ ' + err.message);
           return;
         }
-        // Skil mellom ekte konflikt (menneskelig forfatter endret denne filen) og repo-kø (bot)
+        // Skil mellom ekte konflikt (menneskelig forfatter) og repo-kø (bot)
         setStatus(qeLang === 'en' ? 'Checking…' : 'Sjekker…');
         var h = { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github+json' };
         fetch('https://api.github.com/repos/' + qeRepo + '/commits?path=' + encodeURIComponent(qeFilePath) + '&per_page=1', { headers: h })
@@ -1325,13 +1325,23 @@ setTimeout(function() {
           .then(function(commits) {
             var login = commits && commits[0] && commits[0].author && commits[0].author.login;
             var isHuman = login && login !== 'github-actions[bot]';
-            var msg = isHuman
-              ? (qeLang === 'en' ? 'Conflict: this page was changed by @' + login + '. Try again.' : 'Konflikt: siden ble endret av @' + login + '. Prøv igjen.')
-              : (qeLang === 'en' ? 'Could not save – repo busy. Try again.' : 'Lagring avvist – repo opptatt. Prøv igjen.');
-            setStatus('⚠ ' + msg);
+            if (isHuman) {
+              // Ekte konflikt – vis feilmelding og "Prøv igjen"-knapp
+              saveBtn.disabled = false;
+              saveBtn.style.background = '';
+              saveBtn.style.cursor = '';
+              saveBtn.textContent = qeLang === 'en' ? 'Retry' : 'Prøv igjen';
+              setStatus('⚠ ' + (qeLang === 'en' ? 'Conflict: page changed by @' + login + '. Try again.' : 'Konflikt: siden ble endret av @' + login + '. Prøv igjen.'));
+            } else {
+              // Bot-commit / repo-kø – prøv igjen automatisk uten å forstyrre brukeren
+              setStatus(qeLang === 'en' ? 'Retrying…' : 'Prøver igjen…');
+              setTimeout(function() { saveBtn.click(); }, 3000);
+            }
           })
           .catch(function() {
-            setStatus('⚠ ' + (qeLang === 'en' ? 'Could not save. Try again.' : 'Lagring feilet. Prøv igjen.'));
+            // Kan ikke avgjøre årsak – auto-retry
+            setStatus(qeLang === 'en' ? 'Retrying…' : 'Prøver igjen…');
+            setTimeout(function() { saveBtn.click(); }, 3000);
           });
       });
   });
