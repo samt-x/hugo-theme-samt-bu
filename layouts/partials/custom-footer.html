@@ -726,7 +726,7 @@ function loadTiptap(callback) {
     delRepo = repo;
     delDirPath = dirPath;
     delLang = lang || 'nb';
-    delTitle = title;
+    delTitle = (typeof title === 'string') ? title.replace(/^"(.*)"$/, '$1') : title;
     delParentUrl = parentUrl;
 
     if (!getStoredToken()) {
@@ -826,7 +826,7 @@ function loadTiptap(callback) {
     document.getElementById('del-heading').textContent =
       delLang === 'en' ? 'Deleting "' + delTitle + '"…' : 'Sletter «' + delTitle + '»…';
     document.getElementById('del-build-status-text').textContent =
-      delLang === 'en' ? 'Waiting for build to start…' : 'Bygging av nettstedet starter om litt…';
+      delLang === 'en' ? 'Updating site (0s)…' : 'Nettsted oppdateres (0 sek)…';
     document.getElementById('del-panel-done').style.display = 'none';
   }
 
@@ -877,9 +877,10 @@ function loadTiptap(callback) {
         var doneBtn = document.getElementById('del-panel-done');
         if (doneBtn) doneBtn.style.display = 'inline-block';
       },
-      function onStatus(msg) {
+      function onStatus() {
+        var elapsed = Math.round((Date.now() - startTime) / 1000);
         var statusEl = document.getElementById('del-build-status-text');
-        if (statusEl) statusEl.textContent = msg;
+        if (statusEl) statusEl.textContent = lang === 'en' ? 'Updating site (' + elapsed + 's)…' : 'Nettsted oppdateres (' + elapsed + ' sek)…';
       }
     );
   }
