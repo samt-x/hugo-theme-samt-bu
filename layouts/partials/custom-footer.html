@@ -1128,13 +1128,19 @@ function loadTiptap(callback) {
     var startTime  = Date.now();
     var commitMsg  = (qeLang === 'en' ? 'Updated: ' : 'Oppdatert: ') + qePageTitle;
 
+    // Hent ETag for nåværende side async (best-effort) – brukes til å detektere deploy
+    var qeOldEtag = null;
+    fetch(qePermalink, { method: 'HEAD', cache: 'no-store' })
+      .then(function(r) { qeOldEtag = r.headers.get('etag') || r.headers.get('last-modified') || null; })
+      .catch(function() {});
+
     uploadQeBlobs(token, qeRepo, imgDir, qeImages)
       .then(function(blobItems) { return createQeCommit(token, qeRepo, qeFilePath, newContent, blobItems, commitMsg); })
       .then(function() {
         setStatus(qeLang === 'en' ? 'Saved! Building…' : 'Lagret! Bygger…');
         saveBtn.disabled = false;
         saveBtn.textContent = qeLang === 'en' ? 'Save' : 'Lagre';
-        pollQeBuild(startTime);
+        pollQeBuild(startTime, qeOldEtag);
       })
       .catch(function(err) {
         setStatus('Feil: ' + err.message);
@@ -1143,22 +1149,42 @@ function loadTiptap(callback) {
       });
   });
 
-  function pollQeBuild(startTime) {
+  function pollQeBuild(startTime, oldEtag) {
     var lang = qeLang;
-    qePollTimer = startGhPoll(startTime,
-      function onDone() {
-        clearInterval(qePollTimer); qePollTimer = null;
-        setStatus(lang === 'en' ? '✓ Done' : '✓ Ferdig');
-        var saveBtn = document.getElementById('qe-save-btn');
-        saveBtn.textContent = lang === 'en' ? 'Close & reload ↗' : 'Lukk og last inn ↗';
-        saveBtn.onclick = function() { window.location.href = qePermalink + '?_=' + Date.now(); };
-      },
-      function onError(reason) {
-        clearInterval(qePollTimer); qePollTimer = null;
-        setStatus('⚠ ' + reason);
-      },
-      function onStatus(msg) { setStatus(msg); }
-    );
+    var url = qePermalink;
+    var attempts = 0;
+
+    function doNav() { window.location.href = url + '?_=' + Date.now(); }
+
+    function onBuildDone() {
+      clearInterval(qePollTimer); qePollTimer = null;
+      var secs = 2;
+      setStatus(lang === 'en' ? '✓ Done! Reloading in ' + secs + 's…' : '✓ Ferdig! Laster inn om ' + secs + ' sek…');
+      var btn = document.getElementById('qe-save-btn');
+      if (btn) { btn.textContent = lang === 'en' ? 'Reload now ↗' : 'Last inn nå ↗'; btn.onclick = function() { clearTimeout(navTimer); doNav(); }; }
+      var navTimer = setTimeout(doNav, secs * 1000);
+    }
+
+    if (oldEtag) {
+      // ETag-deteksjon: vent til Cloudflare serverer ny versjon (same-origin HEAD-poll)
+      qePollTimer = setInterval(function() {
+        if (++attempts > 90) { clearInterval(qePollTimer); qePollTimer = null; setStatus('⚠ Tidsavbrudd'); return; }
+        fetch(url + (url.indexOf('?') >= 0 ? '&' : '?') + '_cf=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
+          .then(function(r) {
+            var newEtag = r.headers.get('etag') || r.headers.get('last-modified');
+            if (r.ok && newEtag && newEtag !== oldEtag) onBuildDone();
+            else setStatus(lang === 'en' ? 'Waiting for deploy…' : 'Venter på deploy…');
+          })
+          .catch(function() { setStatus('Venter…'); });
+      }, 3000);
+    } else {
+      // Fallback: GitHub Actions API (2s intervall)
+      qePollTimer = startGhPoll(startTime,
+        onBuildDone,
+        function onError(reason) { clearInterval(qePollTimer); qePollTimer = null; setStatus('⚠ ' + reason); },
+        function onStatus(msg) { setStatus(msg); }
+      );
+    }
   }
 
   function uploadQeBlobs(token, repo, dirPath, images) {
