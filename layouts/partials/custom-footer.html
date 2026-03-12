@@ -1138,8 +1138,20 @@ function loadTiptap(callback) {
       .then(function(r) { qeOldEtag = r.headers.get('etag') || r.headers.get('last-modified') || null; })
       .catch(function() {});
 
+    function tryCommit(blobItems, attemptsLeft) {
+      return createQeCommit(token, qeRepo, qeFilePath, newContent, blobItems, commitMsg)
+        .catch(function(err) {
+          if (err.message === 'Update is not a fast forward' && attemptsLeft > 0) {
+            setStatus(qeLang === 'en' ? 'Retrying…' : 'Prøver på nytt…');
+            return new Promise(function(res) { setTimeout(res, 1500); })
+              .then(function() { return tryCommit(blobItems, attemptsLeft - 1); });
+          }
+          throw err;
+        });
+    }
+
     uploadQeBlobs(token, qeRepo, imgDir, qeImages)
-      .then(function(blobItems) { return createQeCommit(token, qeRepo, qeFilePath, newContent, blobItems, commitMsg); })
+      .then(function(blobItems) { return tryCommit(blobItems, 2); })
       .then(function() {
         setStatus(qeLang === 'en' ? 'Saved! Updating site…' : 'Lagret! Nettstedet oppdateres…');
         saveBtn.disabled = true;
