@@ -17,7 +17,10 @@ function getStoredToken() {
 }
 
 function storeToken(token) {
-  try { localStorage.setItem(SAMT_TOKEN_KEY, token); } catch(e) {}
+  try {
+    localStorage.setItem(SAMT_TOKEN_KEY, token);
+    localStorage.removeItem('samt-bu-gh-user'); // rydd bort cache ved ny innlogging
+  } catch(e) {}
 }
 
 function doGitHubLogin(onSuccess) {
@@ -75,6 +78,24 @@ function checkBuildInProgress(callback) {
       }
     })
     .catch(function() { callback(false); });
+}
+
+// Hent og cache innlogget GitHub-brukernavn (brukes til last_editor i frontmatter)
+function fetchCurrentUser(callback) {
+  var cached = localStorage.getItem('samt-bu-gh-user');
+  if (cached) { callback(cached); return; }
+  var token = getStoredToken();
+  if (!token) { callback(null); return; }
+  fetch('https://api.github.com/user', {
+    headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github+json' }
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(u) {
+      var login = u.login || null;
+      if (login) { try { localStorage.setItem('samt-bu-gh-user', login); } catch(e) {} }
+      callback(login);
+    })
+    .catch(function() { callback(null); });
 }
 
 // Poll GitHub Actions workflow – brukes for rediger og slett (2s intervall)
@@ -157,6 +178,9 @@ function loadTiptap(callback) {
     alert('Kunne ikke laste editoren. Prøv å oppdatere siden.');
   });
 }
+
+// Pre-hent GitHub-brukernavn hvis innlogget (popuperer cache for bruk ved lagring)
+if (getStoredToken() && !localStorage.getItem('samt-bu-gh-user')) fetchCurrentUser(function() {});
 </script>
 
 <!-- Language switcher toggle -->
@@ -1053,6 +1077,8 @@ function loadTiptap(callback) {
       var w = document.getElementById('qe-build-warning');
       if (w) w.style.display = active ? 'block' : 'none';
     });
+    // Varm opp brukernavn-cache for bruk ved lagring
+    fetchCurrentUser(function() {});
 
     loadTiptap(function() {
       var T = window._Tiptap;
@@ -1175,6 +1201,8 @@ function loadTiptap(callback) {
     else              fm = removeFmField(fm, 'status');
     if (document.getElementById('qe-field-hidetoc').checked) fm = setFmField(fm, 'hide_toc', 'hide_toc: true');
     else              fm = removeFmField(fm, 'hide_toc');
+    var editorLogin = localStorage.getItem('samt-bu-gh-user');
+    if (editorLogin) fm = setFmField(fm, 'last_editor', 'last_editor: ' + editorLogin);
 
     var newContent = fm + body + '\n';
     var imgDir     = qeFilePath.replace('/_index.' + qeLang + '.md', '');

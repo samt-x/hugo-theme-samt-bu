@@ -103,6 +103,9 @@
               {{ if not .Lastmod.IsZero }}
                 <span class="page-meta-lastmod">{{T "Last-modified"}}: {{ .Lastmod.Format "2006-01-02 15:04" }}</span>
               {{ end }}
+              {{ with .Params.last_editor }}
+                <span class="page-meta-editor" style="color: #888; font-size: 0.85em; margin-left: 0.3em;">(@{{ . }})</span>
+              {{ end }}
               {{ with .Params.id }}
                 <span class="page-meta-id" style="color: #aaa; font-size: 0.85em;">ID: {{ . }}</span>
               {{ end }}
