@@ -58,6 +58,25 @@ function doGitHubLogin(onSuccess) {
   window.addEventListener('message', handleMessage);
 }
 
+// Sjekk om eit bygg pågår akkurat nå – returnerer true/false via callback (best-effort)
+function checkBuildInProgress(callback) {
+  var token = getStoredToken();
+  var h = { 'Accept': 'application/vnd.github+json' };
+  if (token) h['Authorization'] = 'token ' + token;
+  fetch('https://api.github.com/repos/SAMT-X/samt-bu-docs/actions/workflows/hugo.yml/runs?per_page=1', { headers: h })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var run = data.workflow_runs && data.workflow_runs[0];
+      if (run && (run.status === 'in_progress' || run.status === 'queued')) {
+        var age = (Date.now() - new Date(run.created_at).getTime()) / 1000;
+        callback(age < 600);
+      } else {
+        callback(false);
+      }
+    })
+    .catch(function() { callback(false); });
+}
+
 // Poll GitHub Actions workflow – brukes for rediger og slett (2s intervall)
 function startGhPoll(startTime, onDone, onError, onStatus) {
   var token = getStoredToken();
@@ -1003,14 +1022,14 @@ function loadTiptap(callback) {
     });
   }
 
-  window.openQuillEditDialog = function(repo, filePath, lang, pageTitle, permalink) {
+  window.openEditDialog = function(repo, filePath, lang, pageTitle, permalink) {
     qeRepo = repo; qeFilePath = filePath; qeLang = lang || 'nb';
     qePageTitle = pageTitle; qePermalink = permalink || '';
     qeImages = {}; qeImageMap = {};
 
     if (!getStoredToken()) {
       doGitHubLogin(function() {
-        window.openQuillEditDialog(repo, filePath, lang, pageTitle, permalink);
+        window.openEditDialog(repo, filePath, lang, pageTitle, permalink);
       });
       return;
     }
@@ -1022,8 +1041,18 @@ function loadTiptap(callback) {
     saveBtn.disabled = true;
     saveBtn.onclick = null;
     saveBtn.textContent = lang === 'en' ? 'Save' : 'Lagre';
+    saveBtn.style.background = '';
+    saveBtn.style.cursor = '';
+    var cancelBtn = document.getElementById('qe-cancel-btn');
+    if (cancelBtn) cancelBtn.textContent = lang === 'en' ? 'Cancel' : 'Avbryt';
     setStatus(lang === 'en' ? 'Loading…' : 'Laster…');
     overlay.style.display = 'flex';
+
+    // Sjekk om bygg pågår – vis advarsel (blokkerer ikke)
+    checkBuildInProgress(function(active) {
+      var w = document.getElementById('qe-build-warning');
+      if (w) w.style.display = active ? 'block' : 'none';
+    });
 
     loadTiptap(function() {
       var T = window._Tiptap;
@@ -1174,6 +1203,10 @@ function loadTiptap(callback) {
         saveBtn.textContent = qeLang === 'en' ? 'Saved' : 'Lagret';
         saveBtn.style.background = '#888';
         saveBtn.style.cursor = 'default';
+        var cancelBtn = document.getElementById('qe-cancel-btn');
+        if (cancelBtn) cancelBtn.textContent = qeLang === 'en' ? 'Close this window' : 'Lukk dette vinduet';
+        var w = document.getElementById('qe-build-warning');
+        if (w) w.style.display = 'none';
         pollQeBuild(startTime, qeOldEtag);
       })
       .catch(function(err) {

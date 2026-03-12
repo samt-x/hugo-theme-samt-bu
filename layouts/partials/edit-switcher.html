@@ -117,7 +117,7 @@
   <ul class="tema-switcher-menu align-right" id="edit-menu">
     {{ if and .File (ne $entrySlug "") }}
     <li>
-      <a href="#" onclick="openQuillEditDialog('{{ $githubRepo }}', '{{ $dirPath }}/_index.{{ $lang }}.md', '{{ $lang }}', {{ .Title | jsonify }}, '{{ .RelPermalink }}'); return false;">
+      <a href="#" onclick="openEditDialog('{{ $githubRepo }}', '{{ $dirPath }}/_index.{{ $lang }}.md', '{{ $lang }}', {{ .Title | jsonify }}, '{{ .RelPermalink }}'); return false;">
         <i class="fa fa-pencil"></i>
         <span>{{ cond (eq $lang "en") "Edit this chapter" "Rediger dette kapitlet" }}</span>
       </a>
@@ -236,7 +236,7 @@
   </div>
 </div>
 
-{{/* Modal: Rediger innhold – full-skjerm Quill WYSIWYG-editor */}}
+{{/* Modal: Rediger innhold – full-skjerm TipTap WYSIWYG-editor */}}
 <style>
   /* TipTap toolbar – delt av np-dialog og qe-dialog */
   .tiptap-toolbar { flex-shrink:0; background:#f8f9fa; border-bottom:1px solid #ccc; padding:4px 8px; display:flex; flex-wrap:wrap; gap:3px; align-items:center; }
@@ -293,6 +293,9 @@
       <button type="button" id="qe-cancel-btn" style="padding:.35rem .9rem; border:1px solid rgba(255,255,255,.5); border-radius:4px; background:transparent; color:#fff; cursor:pointer; font-size:15px; font-family:inherit;">{{ cond (eq $lang "en") "Cancel" "Avbryt" }}</button>
       <button type="button" id="qe-save-btn" style="padding:.35rem 1rem; border:none; border-radius:4px; background:#fff; color:#1a4a8a; cursor:pointer; font-size:15px; font-family:inherit; font-weight:600;">{{ cond (eq $lang "en") "Save" "Lagre" }}</button>
     </div>
+  </div>
+  <div id="qe-build-warning" style="display:none; padding:.45rem 1.25rem; background:#fffbeb; border-bottom:1px solid #f5d78a; color:#7c4f00; font-size:.9rem; flex-shrink:0;">
+    ⚠ {{ cond (eq $lang "en") "A build is currently in progress. Saving may cause a conflict — wait until the build is done." "Et bygg pågår akkurat nå. Lagring kan føre til konflikt – vent til bygget er ferdig." }}
   </div>
   <div id="qe-meta-panel" style="background:#f0f4f8; border-bottom:1px solid #d0d8e8; flex-shrink:0;">
     <div style="max-width:960px; width:100%; margin:0 auto; padding:.5rem 0; display:flex; gap:.6rem; align-items:center; flex-wrap:wrap;">
