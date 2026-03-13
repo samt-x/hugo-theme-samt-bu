@@ -226,6 +226,17 @@ setTimeout(function() {
   if (!p || !p.count || !p.lastSaveAt) return;
   if ((Date.now() - p.lastSaveAt) > 600000) { samtuClearPending(); return; } // > 10 min – anta ferdig
   samtuShowPendingIndicator(p.count);
+  // Start GitHub-poll for å rydde spinneren når bygget er ferdig (selv etter sidenavigering)
+  var resumeTimer = startGhPoll(p.lastSaveAt, function() {
+    clearInterval(resumeTimer);
+    samtuClearPending();
+    samtuShowDoneIndicator();
+  }, function() {
+    clearInterval(resumeTimer);
+    samtuClearPending();
+    var ind = document.getElementById('qe-job-indicator');
+    if (ind) ind.style.display = 'none';
+  }, function() {});
 }, 200);
 </script>
 
