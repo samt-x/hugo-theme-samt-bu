@@ -230,7 +230,7 @@ setTimeout(function() {
   var resumeTimer = startGhPoll(p.lastSaveAt, function() {
     clearInterval(resumeTimer);
     samtuClearPending();
-    samtuShowDoneIndicator();
+    window.location.href = window.location.href.split('?')[0] + '?_=' + Date.now();
   }, function() {
     clearInterval(resumeTimer);
     samtuClearPending();
