@@ -1308,20 +1308,20 @@ setTimeout(function() {
       setStatus('⚠ ' + (qeLang === 'en' ? 'Save failed. Try again.' : 'Lagring feilet. Prøv igjen.'));
     }
 
-    function tryCommit(blobItems, attemptsLeft) {
+    function tryCommit(blobItems, deadline) {
       return createQeCommit(token, qeRepo, qeFilePath, newContent, blobItems, commitMsg)
         .catch(function(err) {
-          if (err.message === 'Update is not a fast forward' && attemptsLeft > 0) {
+          if (err.message === 'Update is not a fast forward' && Date.now() < deadline) {
             setStatus(qeLang === 'en' ? 'Retrying…' : 'Prøver på nytt…');
-            return new Promise(function(res) { setTimeout(res, 1500); })
-              .then(function() { return tryCommit(blobItems, attemptsLeft - 1); });
+            return new Promise(function(res) { setTimeout(res, 2000); })
+              .then(function() { return tryCommit(blobItems, deadline); });
           }
           throw err;
         });
     }
 
     uploadQeBlobs(token, qeRepo, imgDir, qeImages)
-      .then(function(blobItems) { lastBlobItems = blobItems; return tryCommit(blobItems, 5); })
+      .then(function(blobItems) { lastBlobItems = blobItems; return tryCommit(blobItems, Date.now() + 60000); })
       .then(onSaveSuccess)
       .catch(function(err) {
         if (err.message !== 'Update is not a fast forward') {
@@ -1332,7 +1332,7 @@ setTimeout(function() {
           setStatus('⚠ ' + err.message);
           return;
         }
-        // Skil mellom ekte konflikt (menneskelig forfatter) og repo-kø (bot)
+        // Etter 60 sek med "not a fast forward": skil mellom ekte konflikt og bot
         setStatus(qeLang === 'en' ? 'Checking…' : 'Sjekker…');
         var h = { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github+json' };
         fetch('https://api.github.com/repos/' + qeRepo + '/commits?path=' + encodeURIComponent(qeFilePath) + '&per_page=1', { headers: h })
@@ -1340,20 +1340,13 @@ setTimeout(function() {
           .then(function(commits) {
             var login = commits && commits[0] && commits[0].author && commits[0].author.login;
             var isHuman = login && login !== 'github-actions[bot]';
-            if (isHuman) {
-              // Ekte konflikt – vis hvem som endret siden
-              saveBtn.disabled = false;
-              saveBtn.style.background = '';
-              saveBtn.style.cursor = '';
-              saveBtn.textContent = qeLang === 'en' ? 'Retry' : 'Prøv igjen';
-              setStatus('⚠ ' + (qeLang === 'en' ? 'Conflict: page changed by @' + login + '. Try again.' : 'Konflikt: siden ble endret av @' + login + '. Prøv igjen.'));
-            } else {
-              // Bot-commit (UUID-steg i bygg) – auto-retry etter at bygget har roet seg
-              setStatus(qeLang === 'en' ? 'Build in progress – retrying…' : 'Bygg pågår – prøver igjen…');
-              setTimeout(function() {
-                tryCommit(lastBlobItems, 5).then(onSaveSuccess).catch(onSaveFinalError);
-              }, 8000);
-            }
+            saveBtn.disabled = false;
+            saveBtn.style.background = '';
+            saveBtn.style.cursor = '';
+            saveBtn.textContent = qeLang === 'en' ? 'Retry' : 'Prøv igjen';
+            setStatus('⚠ ' + (isHuman
+              ? (qeLang === 'en' ? 'Conflict: page changed by @' + login + '. Try again.' : 'Konflikt: siden ble endret av @' + login + '. Prøv igjen.')
+              : (qeLang === 'en' ? 'Save failed. Try again.' : 'Lagring feilet. Prøv igjen.')));
           })
           .catch(onSaveFinalError);
       });
