@@ -1392,9 +1392,9 @@ setTimeout(function() {
     var apiBase = 'https://api.github.com/repos/SAMT-X/' + repo;
     var h = { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' };
     var headSha;
-    return fetch(apiBase + '/git/ref/heads/main', { headers: h })
+    return fetch(apiBase + '/git/ref/heads/main', { headers: h, cache: 'no-store' })
       .then(function(r) { return r.json(); })
-      .then(function(ref) { headSha = ref.object.sha; return fetch(apiBase + '/git/commits/' + headSha, { headers: h }); })
+      .then(function(ref) { headSha = ref.object.sha; return fetch(apiBase + '/git/commits/' + headSha, { headers: h, cache: 'no-store' }); })
       .then(function(r) { return r.json(); })
       .then(function(commit) {
         var items = [{ path: filePath, mode: '100644', type: 'blob', content: content }].concat(blobItems || []);
