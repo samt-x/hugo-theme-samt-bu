@@ -261,6 +261,9 @@
             icon.classList.toggle('fa-sort-down', isActive || isParent);
             icon.classList.toggle('fa-caret-right', !isActive && !isParent);
           }
+          // Tving ul-synlighet direkte (bypass CSS-spesifisitet og eventuelle inline-stiler)
+          var ul = li.querySelector(':scope > ul');
+          if (ul) ul.style.display = (isActive || isParent) ? 'block' : '';
         });
       }
       applyActiveParent();
