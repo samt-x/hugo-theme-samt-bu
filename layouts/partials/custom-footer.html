@@ -206,27 +206,18 @@ function loadTiptap(callback) {
     return;
   }
   window._tiptapLoading = true;
-  Promise.all([
-    import('https://esm.sh/@tiptap/core@2.26.0'),
-    import('https://esm.sh/@tiptap/starter-kit@2.26.0'),
-    import('https://esm.sh/@tiptap/extension-table@2.26.0'),
-    import('https://esm.sh/@tiptap/extension-table-row@2.26.0'),
-    import('https://esm.sh/@tiptap/extension-table-cell@2.26.0'),
-    import('https://esm.sh/@tiptap/extension-table-header@2.26.0'),
-    import('https://esm.sh/@tiptap/extension-link@2.26.0'),
-    import('https://esm.sh/@tiptap/extension-image@2.26.0'),
-    import('https://esm.sh/tiptap-markdown@0.8.10')
-  ]).then(function(mods) {
+  // Selvhostet bundle – unngår esm.sh CDN-instabilitet (se endringslogg 2026-03-14)
+  import('/js/tiptap-bundle.js').then(function(mod) {
     window._Tiptap = {
-      Editor:      mods[0].Editor,
-      StarterKit:  mods[1].default,
-      Table:       mods[2].Table,
-      TableRow:    mods[3].TableRow,
-      TableCell:   mods[4].TableCell,
-      TableHeader: mods[5].TableHeader,
-      Link:        mods[6].Link,
-      Image:       mods[7].Image,
-      Markdown:    mods[8].Markdown || (mods[8].default && mods[8].default.Markdown) || mods[8].default
+      Editor:      mod.Editor,
+      StarterKit:  mod.StarterKit,
+      Table:       mod.Table,
+      TableRow:    mod.TableRow,
+      TableCell:   mod.TableCell,
+      TableHeader: mod.TableHeader,
+      Link:        mod.Link,
+      Image:       mod.Image,
+      Markdown:    mod.Markdown
     };
     window.dispatchEvent(new Event('tiptap-ready'));
     callback();
