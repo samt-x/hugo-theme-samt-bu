@@ -1306,7 +1306,7 @@ setTimeout(function() {
     else              fm = removeFmField(fm, 'hide_toc');
     var editorLogin = localStorage.getItem('samt-bu-gh-user');
     var editorName  = localStorage.getItem('samt-bu-gh-name');
-    var editorValue = editorLogin ? (editorName ? editorLogin + ' (' + editorName + ')' : editorLogin) : null;
+    var editorValue = editorLogin ? editorLogin + ' (' + (editorName || 'ukjent navn') + ')' : null;
     if (editorValue) fm = setFmField(fm, 'last_editor', 'last_editor: ' + editorValue);
 
     var newContent = fm + body + '\n';
