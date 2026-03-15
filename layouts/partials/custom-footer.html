@@ -98,7 +98,9 @@ function fetchCurrentUser(callback) {
     .then(function(r) { return r.json(); })
     .then(function(u) {
       var login = u.login || null;
+      var name  = u.name  || null;
       if (login) { try { localStorage.setItem('samt-bu-gh-user', login); } catch(e) {} }
+      if (name)  { try { localStorage.setItem('samt-bu-gh-name',  name);  } catch(e) {} }
       callback(login);
     })
     .catch(function() { callback(null); });
@@ -1303,7 +1305,9 @@ setTimeout(function() {
     if (document.getElementById('qe-field-hidetoc').checked) fm = setFmField(fm, 'hide_toc', 'hide_toc: true');
     else              fm = removeFmField(fm, 'hide_toc');
     var editorLogin = localStorage.getItem('samt-bu-gh-user');
-    if (editorLogin) fm = setFmField(fm, 'last_editor', 'last_editor: ' + editorLogin);
+    var editorName  = localStorage.getItem('samt-bu-gh-name');
+    var editorValue = editorLogin ? (editorName ? editorLogin + ' (' + editorName + ')' : editorLogin) : null;
+    if (editorValue) fm = setFmField(fm, 'last_editor', 'last_editor: ' + editorValue);
 
     var newContent = fm + body + '\n';
     var imgDir     = qeFilePath.replace('/_index.' + qeLang + '.md', '');

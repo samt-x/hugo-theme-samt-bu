@@ -100,10 +100,12 @@
               <p class="a-leadText" id="leadText">{{.Description}}</p>
             {{end}}
             <div class="page-meta">
-              {{ $editor := .Params.last_editor }}
+              {{ $editor := "" }}
+              {{ $editorLabel := "av" }}
+              {{ with .Params.last_editor }}{{ $editor = . }}{{ $editorLabel = "av bruker:" }}{{ end }}
               {{ if not $editor }}{{ with .GitInfo }}{{ $editor = .AuthorName }}{{ end }}{{ end }}
               {{ if not .Lastmod.IsZero }}
-                <span class="page-meta-lastmod">{{T "Last-modified"}}: {{ .Lastmod.Format "2006-01-02 15:04" }}{{ with $editor }}<span style="margin-left:0.3em;">av {{ . }}</span>{{ end }}</span>
+                <span class="page-meta-lastmod">{{T "Last-modified"}}: {{ .Lastmod.Format "2006-01-02 15:04" }}{{ with $editor }}<span style="margin-left:0.3em;">{{ $editorLabel }} {{ . }}</span>{{ end }}</span>
               {{ end }}
               {{ with .Params.id }}
                 <span class="page-meta-id">ID: {{ . }}</span>
