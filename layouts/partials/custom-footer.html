@@ -1254,7 +1254,7 @@ setTimeout(function() {
             sel.appendChild(o);
           });
 
-          document.getElementById('qe-field-hidetoc').checked = parseFmField(qeFrontmatter, 'hide_toc') === 'true';
+          document.getElementById('qe-field-hidetoc').checked = parseFmField(qeFrontmatter, 'hide_toc') !== 'true';
 
           setStatus('');
           saveBtn.disabled = false;
@@ -1302,7 +1302,7 @@ setTimeout(function() {
     else              fm = removeFmField(fm, 'weight');
     if (newStatus)    fm = setFmField(fm, 'status', 'status: ' + newStatus);
     else              fm = removeFmField(fm, 'status');
-    if (document.getElementById('qe-field-hidetoc').checked) fm = setFmField(fm, 'hide_toc', 'hide_toc: true');
+    if (!document.getElementById('qe-field-hidetoc').checked) fm = setFmField(fm, 'hide_toc', 'hide_toc: true');
     else              fm = removeFmField(fm, 'hide_toc');
     var editorLogin = localStorage.getItem('samt-bu-gh-user');
     var editorName  = localStorage.getItem('samt-bu-gh-name');
