@@ -176,31 +176,54 @@ function samtuUnlockAudio() {
   } catch(e) {}
 }
 
-function samtuPlaySuccess() {
+function _samtuPlayNotes(notes) {
+  // notes: [[hz, startOffset, duration], ...]
+  if (!_samtuAudioCtx) return;
+  _samtuAudioCtx.resume().then(function() {
+    var t = _samtuAudioCtx.currentTime;
+    notes.forEach(function(n) {
+      var osc = _samtuAudioCtx.createOscillator();
+      var g = _samtuAudioCtx.createGain();
+      osc.connect(g); g.connect(_samtuAudioCtx.destination);
+      osc.frequency.value = n[0];
+      g.gain.setValueAtTime(0.28, t + n[1]);
+      g.gain.exponentialRampToValueAtTime(0.001, t + n[1] + n[2]);
+      osc.start(t + n[1]);
+      osc.stop(t + n[1] + n[2]);
+    });
+  });
+}
+
+// Opptakt – to stigende pip (kalles når byggjobb starter)
+function samtuPlayStart() {
+  try { _samtuPlayNotes([[600,0,0.10],[900,0.13,0.14]]); } catch(e) {}
   try {
-    if (_samtuAudioCtx) {
-      _samtuAudioCtx.resume().then(function() {
-        var osc = _samtuAudioCtx.createOscillator();
-        var gain = _samtuAudioCtx.createGain();
-        osc.connect(gain);
-        gain.connect(_samtuAudioCtx.destination);
-        osc.frequency.value = 880;
-        gain.gain.setValueAtTime(0.3, _samtuAudioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, _samtuAudioCtx.currentTime + 0.4);
-        osc.start();
-        osc.stop(_samtuAudioCtx.currentTime + 0.4);
-      });
-    }
+    var u = new SpeechSynthesisUtterance('Build job started');
+    u.lang = 'en-US'; window.speechSynthesis.speak(u);
   } catch(e) {}
+}
+
+// Seiersfanfare – C-E-G-C stigende (kalles når bygg er ferdig)
+function samtuPlaySuccess() {
+  try { _samtuPlayNotes([[523,0,0.12],[659,0.14,0.12],[784,0.28,0.12],[1047,0.42,0.35]]); } catch(e) {}
   try {
     var u = new SpeechSynthesisUtterance('Build job complete');
-    u.lang = 'en-US';
-    window.speechSynthesis.speak(u);
+    u.lang = 'en-US'; window.speechSynthesis.speak(u);
+  } catch(e) {}
+}
+
+// Wah-wah – fallende tre toner (kalles ved feil eller timeout)
+function samtuPlayFailure() {
+  try { _samtuPlayNotes([[400,0,0.20],[300,0.23,0.20],[220,0.46,0.45]]); } catch(e) {}
+  try {
+    var u = new SpeechSynthesisUtterance('Build job failed');
+    u.lang = 'en-US'; window.speechSynthesis.speak(u);
   } catch(e) {}
 }
 
 // Poll GitHub Actions workflow – brukes for rediger og slett (2s intervall)
 function startGhPoll(startTime, onDone, onError, onStatus) {
+  samtuPlayStart();
   var token = getStoredToken();
   var h = { 'Accept': 'application/vnd.github+json' };
   if (token) h['Authorization'] = 'token ' + token;
@@ -220,7 +243,7 @@ function startGhPoll(startTime, onDone, onError, onStatus) {
           onStatus('Bygger…');
         } else if (run.status === 'completed') {
           if (run.conclusion === 'success') { samtuPlaySuccess(); onDone(); }
-          else onError(run.conclusion);
+          else { samtuPlayFailure(); onError(run.conclusion); }
         }
       })
       .catch(function() { onStatus('Sjekker…'); });
@@ -229,9 +252,10 @@ function startGhPoll(startTime, onDone, onError, onStatus) {
 
 // Poll URL direkte – brukes for ny side (same-origin, ingen token)
 function startUrlPoll(url, onDone, onError, onStatus) {
+  samtuPlayStart();
   var attempts = 0;
   return setInterval(function() {
-    if (++attempts > 90) { onError('timeout'); return; }
+    if (++attempts > 90) { samtuPlayFailure(); onError('timeout'); return; }
     fetch(url + (url.indexOf('?') >= 0 ? '&' : '?') + '_cf=' + Date.now(),
           { method: 'HEAD', cache: 'no-store' })
       .then(function(r) {
