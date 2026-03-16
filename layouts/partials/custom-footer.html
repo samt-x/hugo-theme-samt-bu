@@ -1601,8 +1601,9 @@ setTimeout(function() {
 
   function saveState(overlay) {
     if (overlay.dataset.maximized === '1') return;
+    if (!overlay.offsetWidth || !overlay.offsetHeight) return; // display:none – ikke lagre
     try {
-      localStorage.setItem(overlay.id + '-win-v2', JSON.stringify({
+      localStorage.setItem(overlay.id + '-win-v3', JSON.stringify({
         left: overlay.offsetLeft,
         top: overlay.offsetTop,
         width: overlay.offsetWidth,
@@ -1613,7 +1614,7 @@ setTimeout(function() {
 
   function applyState(overlay) {
     try {
-      var s = JSON.parse(localStorage.getItem(overlay.id + '-win-v2'));
+      var s = JSON.parse(localStorage.getItem(overlay.id + '-win-v3'));
       if (s && s.left != null) {
         overlay.style.left   = Math.max(0, s.left)   + 'px';
         overlay.style.top    = Math.max(0, s.top)    + 'px';
