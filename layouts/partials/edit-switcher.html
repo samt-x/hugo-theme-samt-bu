@@ -281,12 +281,14 @@
     line-height: 1.2;
     vertical-align: middle;
   }
-  /* select: fjern eksplisitt height – la padding styre størrelsen slik at tekst sentreres naturlig */
+  /* select: Chrome plasserer tekst nederst ved eksplisitt height + vertikal padding.
+     Fix: sett line-height = height og fjern vertikal padding – teksten sentreres i linjen. */
   #qe-meta-panel select,
   #np-form select {
-    height: auto;
-    padding: .35rem .5rem;
-    line-height: normal;
+    height: 2rem;
+    line-height: 2rem;
+    padding-top: 0;
+    padding-bottom: 0;
   }
   /* qe-dialog og np-dialog: full-høyde editor */
   #qe-body-pm { flex:1; overflow-y:auto; min-height:0; }
