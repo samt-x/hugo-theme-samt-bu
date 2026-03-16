@@ -199,12 +199,13 @@
 </div>
 
 {{/* Modal: Ny side – full-skjerm (samme layout som qe-dialog) */}}
-<div id="np-overlay" style="display:none; position:fixed; inset:0; z-index:99999; flex-direction:column; background:#fff;">
-  <div style="display:flex; align-items:center; padding:.6rem 1.25rem; background:#1a4a8a; color:#fff; flex-shrink:0;">
+<div id="np-overlay" style="display:none; position:fixed; left:270px; top:70px; width:calc(100vw - 290px); height:calc(100vh - 90px); z-index:99999; flex-direction:column; background:#fff; box-shadow:0 4px 28px rgba(0,0,0,.32); border-radius:6px; overflow:hidden; resize:both; min-width:420px; min-height:280px;">
+  <div id="np-header" style="display:flex; align-items:center; padding:.6rem 1.25rem; background:#1a4a8a; color:#fff; flex-shrink:0; cursor:move; user-select:none;">
     <div style="flex:1;"></div>
     <span id="np-dialog-title" style="font-size:1.35rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:55%;"></span>
     <div style="flex:1; display:flex; justify-content:flex-end; align-items:center; gap:.6rem;">
       <span id="np-status-text" style="font-size:1rem; opacity:.85; white-space:nowrap;"></span>
+      <button type="button" id="np-maximize-btn" title="{{ cond (eq $lang "en") "Maximize / Restore" "Maksimer / Gjenopprett" }}" style="padding:.35rem .6rem; border:1px solid rgba(255,255,255,.4); border-radius:4px; background:transparent; color:#fff; cursor:pointer; font-size:14px; line-height:1;"><i class="fa fa-expand"></i></button>
       <button type="button" id="np-cancel" style="padding:.35rem .9rem; border:1px solid rgba(255,255,255,.5); border-radius:4px; background:transparent; color:#fff; cursor:pointer; font-size:15px; font-family:inherit;">{{ cond (eq $lang "en") "Cancel" "Avbryt" }}</button>
       <button type="submit" form="np-form" id="np-submit" style="padding:.35rem 1rem; border:none; border-radius:4px; background:#fff; color:#1a4a8a; cursor:pointer; font-size:15px; font-family:inherit; font-weight:600;">{{ cond (eq $lang "en") "Create page" "Opprett side" }}</button>
     </div>
@@ -313,12 +314,13 @@
   #np-body-pm .ProseMirror td, #np-body-pm .ProseMirror th { border:1px solid #ccc; padding:.3em .5em; min-width:40px; }
   #np-body-pm .ProseMirror th { background:#f0f4f8; font-weight:600; }
 </style>
-<div id="qe-overlay" style="display:none; position:fixed; inset:0; z-index:99998; flex-direction:column; background:#fff;">
-  <div style="display:flex; align-items:center; padding:.6rem 1.25rem; background:#1a4a8a; color:#fff; flex-shrink:0;">
+<div id="qe-overlay" style="display:none; position:fixed; left:270px; top:70px; width:calc(100vw - 290px); height:calc(100vh - 90px); z-index:99998; flex-direction:column; background:#fff; box-shadow:0 4px 28px rgba(0,0,0,.32); border-radius:6px; overflow:hidden; resize:both; min-width:420px; min-height:280px;">
+  <div id="qe-header" style="display:flex; align-items:center; padding:.6rem 1.25rem; background:#1a4a8a; color:#fff; flex-shrink:0; cursor:move; user-select:none;">
     <div style="flex:1;"></div>
     <span id="qe-title" style="font-size:1.35rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:55%;"></span>
     <div style="flex:1; display:flex; justify-content:flex-end; align-items:center; gap:.6rem;">
       <span id="qe-status-text" style="font-size:1rem; opacity:.85; white-space:nowrap;"></span>
+      <button type="button" id="qe-maximize-btn" title="{{ cond (eq $lang "en") "Maximize / Restore" "Maksimer / Gjenopprett" }}" style="padding:.35rem .6rem; border:1px solid rgba(255,255,255,.4); border-radius:4px; background:transparent; color:#fff; cursor:pointer; font-size:14px; line-height:1;"><i class="fa fa-expand"></i></button>
       <button type="button" id="qe-cancel-btn" style="padding:.35rem .9rem; border:1px solid rgba(255,255,255,.5); border-radius:4px; background:transparent; color:#fff; cursor:pointer; font-size:15px; font-family:inherit;">{{ cond (eq $lang "en") "Cancel" "Avbryt" }}</button>
       <button type="button" id="qe-save-btn" style="padding:.35rem 1rem; border:none; border-radius:4px; background:#fff; color:#1a4a8a; cursor:pointer; font-size:15px; font-family:inherit; font-weight:600;">{{ cond (eq $lang "en") "Save" "Lagre" }}</button>
     </div>

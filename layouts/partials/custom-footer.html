@@ -601,6 +601,7 @@ setTimeout(function() {
     setNpStatus('');
     npDialogVisible = true;
     overlay.style.display = 'flex';
+    window._applyDialogPos && window._applyDialogPos('np-overlay');
     initNpEditor(function() { document.getElementById('np-title-nb').focus(); });
   };
 
@@ -631,6 +632,7 @@ setTimeout(function() {
     setNpStatus('');
     npDialogVisible = true;
     overlay.style.display = 'flex';
+    window._applyDialogPos && window._applyDialogPos('np-overlay');
     initNpEditor(function() { document.getElementById('np-title-nb').focus(); });
   };
 
@@ -1256,6 +1258,7 @@ setTimeout(function() {
     if (cancelBtn) cancelBtn.textContent = lang === 'en' ? 'Cancel' : 'Avbryt';
     setStatus(lang === 'en' ? 'Loading…' : 'Laster…');
     overlay.style.display = 'flex';
+    window._applyDialogPos && window._applyDialogPos('qe-overlay');
 
     // Sjekk om bygg pågår – vis advarsel (blokkerer ikke)
     checkBuildInProgress(qeFilePath, function(active) {
@@ -1584,5 +1587,106 @@ setTimeout(function() {
     var banner = document.getElementById('page-update-banner');
     if (banner) banner.addEventListener('click', function() { window.location.reload(); });
   }, 1000);
+})();
+
+</script>
+
+<!-- Flytende dialogvinduer: drag, resize-persistens, maksimering -->
+<script>
+(function() {
+  var DIALOGS = [
+    { overlayId: 'qe-overlay', headerId: 'qe-header', maxBtnId: 'qe-maximize-btn' },
+    { overlayId: 'np-overlay', headerId: 'np-header', maxBtnId: 'np-maximize-btn' }
+  ];
+
+  function saveState(overlay) {
+    if (overlay.dataset.maximized === '1') return;
+    try {
+      localStorage.setItem(overlay.id + '-win', JSON.stringify({
+        left: overlay.offsetLeft,
+        top: overlay.offsetTop,
+        width: overlay.offsetWidth,
+        height: overlay.offsetHeight
+      }));
+    } catch(e) {}
+  }
+
+  function applyState(overlay) {
+    try {
+      var s = JSON.parse(localStorage.getItem(overlay.id + '-win'));
+      if (s && s.left != null) {
+        overlay.style.left   = Math.max(0, s.left)   + 'px';
+        overlay.style.top    = Math.max(0, s.top)    + 'px';
+        overlay.style.width  = Math.max(420, s.width) + 'px';
+        overlay.style.height = Math.max(280, s.height) + 'px';
+      }
+    } catch(e) {}
+  }
+
+  function initDrag(overlay, header) {
+    if (!header) return;
+    var active = false, ox, oy, sl, st;
+    header.addEventListener('mousedown', function(e) {
+      if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+      if (overlay.dataset.maximized === '1') return;
+      active = true;
+      ox = e.clientX; oy = e.clientY;
+      sl = overlay.offsetLeft; st = overlay.offsetTop;
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', function(e) {
+      if (!active) return;
+      overlay.style.left = Math.max(0, sl + e.clientX - ox) + 'px';
+      overlay.style.top  = Math.max(0, st + e.clientY - oy) + 'px';
+    });
+    document.addEventListener('mouseup', function() {
+      if (active) { active = false; saveState(overlay); }
+    });
+  }
+
+  function initMaximize(overlay, btn) {
+    if (!btn) return;
+    var prev = null;
+    btn.addEventListener('click', function() {
+      if (overlay.dataset.maximized === '1') {
+        if (prev) {
+          overlay.style.left = prev.left; overlay.style.top = prev.top;
+          overlay.style.width = prev.width; overlay.style.height = prev.height;
+          overlay.style.borderRadius = '6px';
+        }
+        overlay.dataset.maximized = '0';
+        btn.innerHTML = '<i class="fa fa-expand"></i>';
+      } else {
+        prev = { left: overlay.style.left, top: overlay.style.top,
+                 width: overlay.style.width, height: overlay.style.height };
+        overlay.style.left = '0'; overlay.style.top = '0';
+        overlay.style.width = '100vw'; overlay.style.height = '100vh';
+        overlay.style.borderRadius = '0';
+        overlay.dataset.maximized = '1';
+        btn.innerHTML = '<i class="fa fa-compress"></i>';
+      }
+    });
+  }
+
+  function initResize(overlay) {
+    if (!window.ResizeObserver) return;
+    new ResizeObserver(function() { saveState(overlay); }).observe(overlay);
+  }
+
+  DIALOGS.forEach(function(d) {
+    var overlay = document.getElementById(d.overlayId);
+    if (!overlay) return;
+    var header = document.getElementById(d.headerId);
+    var maxBtn = document.getElementById(d.maxBtnId);
+    initDrag(overlay, header);
+    initMaximize(overlay, maxBtn);
+    initResize(overlay);
+  });
+
+  // Kalles av openEditDialog / openNewSiblingDialog / openNewChildDialog etter display = 'flex'
+  window._applyDialogPos = function(overlayId) {
+    var overlay = document.getElementById(overlayId);
+    if (overlay) applyState(overlay);
+  };
 })();
 </script>
