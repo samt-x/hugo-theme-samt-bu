@@ -1455,8 +1455,8 @@ setTimeout(function() {
       clearInterval(qePollTimer); qePollTimer = null;
       samtuDecrementPending();
       if (overlay.style.display !== 'none') {
-        // Dialog er åpen: tell ned og last inn automatisk
-        var secs = 2;
+        // Dialog er åpen: 3s gir fanfare (1.35s) + tale (starter 1.5s) tid til å spille
+        var secs = 3;
         setStatus(lang === 'en' ? '✓ Done! Reloading in ' + secs + 's…' : '✓ Ferdig! Laster inn om ' + secs + ' sek…');
         var btn = document.getElementById('qe-save-btn');
         if (btn) {
@@ -1468,8 +1468,8 @@ setTimeout(function() {
         }
         var navTimer = setTimeout(doNav, secs * 1000);
       } else {
-        // Dialog er lukket: last inn siden automatisk
-        doNav();
+        // Dialog er lukket: forsinkelse slik at fanfare rekker å spille før navigering
+        setTimeout(doNav, 1600);
       }
     }
 
