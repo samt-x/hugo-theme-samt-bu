@@ -176,49 +176,64 @@ function samtuUnlockAudio() {
   } catch(e) {}
 }
 
+// Spill av noter via Web Audio API.
+// notes: [[hz, startOffset, duration], ...]
+// Returnerer total varighet i ms (brukes til å forsinke talen).
 function _samtuPlayNotes(notes) {
-  // notes: [[hz, startOffset, duration], ...]
-  if (!_samtuAudioCtx) return;
+  var end = 0;
+  notes.forEach(function(n) { end = Math.max(end, n[1] + n[2]); });
+  if (!_samtuAudioCtx) return Math.ceil(end * 1000);
   _samtuAudioCtx.resume().then(function() {
     var t = _samtuAudioCtx.currentTime;
     notes.forEach(function(n) {
+      var hz = n[0], s = n[1], d = n[2];
       var osc = _samtuAudioCtx.createOscillator();
       var g = _samtuAudioCtx.createGain();
       osc.connect(g); g.connect(_samtuAudioCtx.destination);
-      osc.frequency.value = n[0];
-      g.gain.setValueAtTime(0.28, t + n[1]);
-      g.gain.exponentialRampToValueAtTime(0.001, t + n[1] + n[2]);
-      osc.start(t + n[1]);
-      osc.stop(t + n[1] + n[2]);
+      osc.frequency.value = hz;
+      // ADSR: rask attack (20ms), sustain, kort release (80ms eller 30% av notelengde)
+      var rel = Math.min(0.08, d * 0.3);
+      g.gain.setValueAtTime(0.001, t + s);
+      g.gain.linearRampToValueAtTime(0.32, t + s + 0.02);
+      g.gain.setValueAtTime(0.32, t + s + d - rel);
+      g.gain.exponentialRampToValueAtTime(0.001, t + s + d);
+      osc.start(t + s);
+      osc.stop(t + s + d + 0.01);
     });
   });
+  return Math.ceil(end * 1000);
+}
+
+// Spill tale etter en forsinkelse (slik at lydsignal alltid kommer først)
+function _samtuSpeak(text, delayMs) {
+  try {
+    setTimeout(function() {
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = 'en-US';
+      window.speechSynthesis.speak(u);
+    }, delayMs);
+  } catch(e) {}
 }
 
 // Opptakt – to stigende pip (kalles når byggjobb starter)
 function samtuPlayStart() {
-  try { _samtuPlayNotes([[600,0,0.10],[900,0.13,0.14]]); } catch(e) {}
-  try {
-    var u = new SpeechSynthesisUtterance('Build job started');
-    u.lang = 'en-US'; window.speechSynthesis.speak(u);
-  } catch(e) {}
+  // 600 Hz (120ms) → 900 Hz (200ms) → tale
+  var ms = _samtuPlayNotes([[600,0,0.12],[900,0.15,0.20]]);
+  _samtuSpeak('Build job started', ms + 150);
 }
 
 // Seiersfanfare – C-E-G-C stigende (kalles når bygg er ferdig)
 function samtuPlaySuccess() {
-  try { _samtuPlayNotes([[523,0,0.12],[659,0.14,0.12],[784,0.28,0.12],[1047,0.42,0.35]]); } catch(e) {}
-  try {
-    var u = new SpeechSynthesisUtterance('Build job complete');
-    u.lang = 'en-US'; window.speechSynthesis.speak(u);
-  } catch(e) {}
+  // C5–E5–G5–C6, siste tone lang for avslutningseffekt
+  var ms = _samtuPlayNotes([[523,0,0.22],[659,0.25,0.22],[784,0.50,0.22],[1047,0.75,0.60]]);
+  _samtuSpeak('Build job complete', ms + 150);
 }
 
-// Wah-wah – fallende tre toner (kalles ved feil eller timeout)
+// Wah-wah – tre fallende toner (kalles ved feil eller timeout)
 function samtuPlayFailure() {
-  try { _samtuPlayNotes([[400,0,0.20],[300,0.23,0.20],[220,0.46,0.45]]); } catch(e) {}
-  try {
-    var u = new SpeechSynthesisUtterance('Build job failed');
-    u.lang = 'en-US'; window.speechSynthesis.speak(u);
-  } catch(e) {}
+  // 400 → 300 → 220 Hz, siste tone lang
+  var ms = _samtuPlayNotes([[400,0,0.25],[300,0.28,0.25],[220,0.56,0.55]]);
+  _samtuSpeak('Build job failed', ms + 150);
 }
 
 // Poll GitHub Actions workflow – brukes for rediger og slett (2s intervall)
