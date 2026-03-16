@@ -158,18 +158,39 @@ function samtuShowDoneIndicator() {
 }
 
 // Lydsignal ved ferdig bygg – beep (Web Audio) + tale (Web Speech)
+// Chrome blokkerer AudioContext og speechSynthesis fra setInterval uten brukergestus.
+// Løsning: lås opp begge på Lagre-klikk (gestus), gjenbruk konteksten ved ferdig bygg.
+var _samtuAudioCtx = null;
+
+function samtuUnlockAudio() {
+  // Opprett/gjenoppta AudioContext under brukergestus
+  try {
+    if (!_samtuAudioCtx) _samtuAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (_samtuAudioCtx.state === 'suspended') _samtuAudioCtx.resume();
+  } catch(e) {}
+  // Lås opp speechSynthesis med stille ytring under brukergestus
+  try {
+    var u = new SpeechSynthesisUtterance(' ');
+    u.volume = 0;
+    window.speechSynthesis.speak(u);
+  } catch(e) {}
+}
+
 function samtuPlaySuccess() {
   try {
-    var ctx = new (window.AudioContext || window.webkitAudioContext)();
-    var osc = ctx.createOscillator();
-    var gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.4);
+    if (_samtuAudioCtx) {
+      _samtuAudioCtx.resume().then(function() {
+        var osc = _samtuAudioCtx.createOscillator();
+        var gain = _samtuAudioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(_samtuAudioCtx.destination);
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.3, _samtuAudioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, _samtuAudioCtx.currentTime + 0.4);
+        osc.start();
+        osc.stop(_samtuAudioCtx.currentTime + 0.4);
+      });
+    }
   } catch(e) {}
   try {
     var u = new SpeechSynthesisUtterance('Build job complete');
@@ -592,6 +613,7 @@ setTimeout(function() {
 
   document.getElementById('np-form').addEventListener('submit', function(e) {
     e.preventDefault();
+    samtuUnlockAudio(); // lås opp lyd under brukergestus
 
     var submitBtn = document.getElementById('np-submit');
     submitBtn.disabled = true;
@@ -1302,6 +1324,7 @@ setTimeout(function() {
     if (!token || !qeEditor) return;
     var saveBtn = document.getElementById('qe-save-btn');
     if (saveBtn.onclick) return; // er i "lukk"-modus – la onclick håndtere det
+    samtuUnlockAudio(); // lås opp lyd under brukergestus
     saveBtn.disabled = true;
     saveBtn.textContent = qeLang === 'en' ? 'Saving…' : 'Lagrer…';
     setStatus('');
