@@ -1730,12 +1730,12 @@ setTimeout(function() {
   function statusIcon(run) {
     if (run.status === 'in_progress')
       return '<i class="fa fa-spinner fa-spin" style="color:#7ec8e3;"></i>';
-    if (run.status === 'queued')
+    if (run.status === 'queued' || run.status === 'waiting' || run.status === 'pending' || run.status === 'requested')
       return '<i class="fa fa-clock-o" style="color:#aaa;"></i>';
     if (run.conclusion === 'success')
       return '<i class="fa fa-check-circle" style="color:#6dbf85;"></i>';
     if (run.conclusion === 'cancelled')
-      return '<i class="fa fa-ban" style="color:#888;" title="Avløst av nyere bygg"></i>';
+      return '<i class="fa fa-check-circle" style="color:#888;" title="Avløst av nyere bygg"></i>';
     return '<i class="fa fa-exclamation-circle" style="color:#e07070;"></i>';
   }
 
@@ -1753,7 +1753,7 @@ setTimeout(function() {
       var msg = run.display_title || run.name || '\u2013';
       if (msg.length > 58) msg = msg.slice(0, 57) + '\u2026';
       var time;
-      if (run.status === 'queued') {
+      if (run.status === 'queued' || run.status === 'waiting' || run.status === 'pending' || run.status === 'requested') {
         time = isEn ? 'In queue' : 'I k\u00f8';
       } else if (run.status === 'in_progress') {
         var elapsedSec = Math.round((Date.now() - new Date(run.created_at).getTime()) / 1000);
