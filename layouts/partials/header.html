@@ -102,6 +102,7 @@
             <div class="page-meta">
               {{ $editor := "" }}
               {{ with .Params.last_editor }}{{ $editor = . }}{{ end }}
+              {{ $editor = $editor | replaceRE ` \(ukjent navn\)` "" }}
               {{ if not $editor }}{{ with .GitInfo }}{{ if not (strings.Contains .AuthorName "[bot]") }}{{ $editor = .AuthorName }}{{ end }}{{ end }}{{ end }}
               {{ if not .Lastmod.IsZero }}
                 <span class="page-meta-lastmod">{{T "Last-modified"}}: {{ .Lastmod.Format "2006-01-02 15:04" }}{{ with $editor }}<span style="margin-left:0.3em;">av bruker: {{ . }}</span>{{ end }}</span>
