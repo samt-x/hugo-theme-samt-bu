@@ -182,6 +182,9 @@ function samtuUnlockAudio() {
 function _samtuPlayNotes(notes) {
   var end = 0;
   notes.forEach(function(n) { end = Math.max(end, n[1] + n[2]); });
+  if (!_samtuAudioCtx) {
+    try { _samtuAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+  }
   if (!_samtuAudioCtx) return Math.ceil(end * 1000);
   _samtuAudioCtx.resume().then(function() {
     var t = _samtuAudioCtx.currentTime;
@@ -345,7 +348,11 @@ setTimeout(function() {
         if (myCompleted > (p2.seenCompleted || 0)) {
           clearInterval(resumeTimer);
           samtuDecrementPending();
-          window.location.href = window.location.href.split('?')[0] + '?_=' + Date.now();
+          samtuShowDoneIndicator();
+          samtuPlaySuccess();
+          setTimeout(function() {
+            window.location.href = window.location.href.split('?')[0] + '?_=' + Date.now();
+          }, 1800);
         }
       })
       .catch(function() {});
