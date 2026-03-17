@@ -965,7 +965,7 @@ setTimeout(function() {
     delRepo = repo;
     delDirPath = dirPath;
     delLang = lang || 'nb';
-    delTitle = (typeof title === 'string') ? title.replace(/^"(.*)"$/, '$1') : title;
+    delTitle = title || '';
     delParentUrl = parentUrl;
     delChildCount = childCount || 0;
 
@@ -979,33 +979,43 @@ setTimeout(function() {
     document.getElementById('del-heading').textContent =
       lang === 'en' ? 'Delete this page' : 'Slett denne siden';
     document.getElementById('del-confirm-text').textContent =
-      lang === 'en' ? 'Delete "' + title + '"?' : 'Vil du slette «' + title + '»?';
+      lang === 'en' ? 'Delete \u201c' + title + '\u201d?' : 'Vil du slette \u00ab' + title + '\u00bb?';
     document.getElementById('del-cancel').textContent = lang === 'en' ? 'Cancel' : 'Avbryt';
     var warningEl = document.getElementById('del-children-warning');
+    var footnoteEl = document.getElementById('del-footnote');
     if (delChildCount > 0) {
       var subLabel = lang === 'en'
         ? (delChildCount === 1 ? '1 sub-chapter' : delChildCount + ' sub-chapters')
         : (delChildCount === 1 ? '1 underkapittel' : delChildCount + ' underkapitler');
-      warningEl.textContent = '\u26a0 ' + (lang === 'en'
+      warningEl.textContent = '\u26a0\ufe0f ' + (lang === 'en'
         ? 'This page has ' + subLabel + '. All sub-pages will also be deleted.'
         : 'Denne siden har ' + subLabel + '. Alle underliggende sider slettes også.');
       warningEl.style.display = 'block';
+      footnoteEl.textContent = lang === 'en'
+        ? 'Both language versions (nb + en) will be deleted.'
+        : 'Begge språkversjoner (nb + en) slettes.';
       document.getElementById('del-confirm-btn').textContent = lang === 'en'
-        ? 'Delete page and ' + subLabel
-        : 'Slett siden og ' + subLabel;
+        ? 'Delete this page and all sub-chapters \u2192'
+        : 'Slett denne siden og alle underkapitler \u2192';
     } else {
       warningEl.style.display = 'none';
+      footnoteEl.textContent = lang === 'en'
+        ? 'Both language versions (nb + en) will be deleted. This cannot be undone.'
+        : 'Begge språkversjoner (nb + en) slettes. Dette kan ikke angres.';
       document.getElementById('del-confirm-btn').textContent = lang === 'en' ? 'Delete page' : 'Slett siden';
     }
     document.getElementById('del-confirm-btn').disabled = false;
     document.getElementById('del-cancel').disabled = false;
     document.getElementById('del-error').style.display = 'none';
+    document.getElementById('del-confirm-section').style.display = 'block';
+    document.getElementById('del-confirm-section-2').style.display = 'none';
     overlay.style.display = 'block';
   };
 
   function closeDialog() {
     overlay.style.display = 'none';
     document.getElementById('del-confirm-section').style.display = 'block';
+    document.getElementById('del-confirm-section-2').style.display = 'none';
     document.getElementById('del-build-section').style.display = 'none';
     // activePollTimer stoppes IKKE her – polling fortsetter i bakgrunnen
     // slik at navigering skjer automatisk når bygget er ferdig
@@ -1017,15 +1027,48 @@ setTimeout(function() {
   document.getElementById('del-panel-close').addEventListener('click', closeDialog);
 
   document.getElementById('del-confirm-btn').addEventListener('click', function() {
+    if (delChildCount > 0) { showStep2(); } else { doCommit(); }
+  });
+
+  function showStep2() {
+    var lang = delLang;
+    var subLabel = lang === 'en'
+      ? (delChildCount === 1 ? '1 sub-chapter' : delChildCount + ' sub-chapters')
+      : (delChildCount === 1 ? '1 underkapittel' : delChildCount + ' underkapitler');
+    document.getElementById('del-s2-title').textContent =
+      lang === 'en' ? 'Are you absolutely sure?' : 'Er du helt sikker?';
+    document.getElementById('del-s2-text').textContent = lang === 'en'
+      ? 'You are about to delete \u201c' + delTitle + '\u201d and all ' + subLabel + '. This cannot be undone. Note: we have not checked whether other pages link to any of the pages being deleted \u2014 such links will break.'
+      : 'Du er i ferd med å slette \u00ab' + delTitle + '\u00bb og alle ' + subLabel + '. Dette kan ikke angres. Merk: vi har ikke sjekket om andre sider lenker til noen av sidene som slettes \u2014 slike lenker vil da bli brutte.';
+    document.getElementById('del-back-btn').textContent = lang === 'en' ? '\u2190 Back' : '\u2190 Tilbake';
+    document.getElementById('del-final-btn').textContent = lang === 'en' ? 'Yes, delete permanently' : 'Ja, slett alt permanent';
+    document.getElementById('del-final-btn').disabled = false;
+    document.getElementById('del-back-btn').disabled = false;
+    document.getElementById('del-confirm-section').style.display = 'none';
+    document.getElementById('del-confirm-section-2').style.display = 'block';
+  }
+
+  document.getElementById('del-back-btn').addEventListener('click', function() {
+    document.getElementById('del-confirm-section-2').style.display = 'none';
+    document.getElementById('del-confirm-section').style.display = 'block';
+  });
+
+  document.getElementById('del-final-btn').addEventListener('click', function() { doCommit(); });
+
+  function doCommit() {
     var token = getStoredToken();
     if (!token) { closeDialog(); return; }
     samtuUnlockAudio();
 
     var confirmBtn = document.getElementById('del-confirm-btn');
     var cancelBtn  = document.getElementById('del-cancel');
-    confirmBtn.disabled = true;
-    confirmBtn.textContent = delLang === 'en' ? 'Deleting…' : 'Sletter…';
-    cancelBtn.disabled = true;
+    var finalBtn   = document.getElementById('del-final-btn');
+    var backBtn    = document.getElementById('del-back-btn');
+    var spinText   = delLang === 'en' ? 'Deleting\u2026' : 'Sletter\u2026';
+    confirmBtn.disabled = true; confirmBtn.textContent = spinText;
+    cancelBtn.disabled  = true;
+    finalBtn.disabled   = true; finalBtn.textContent = spinText;
+    backBtn.disabled    = true;
 
     var startTime = Date.now();
     var nbPath = delDirPath + '/_index.nb.md';
@@ -1050,14 +1093,19 @@ setTimeout(function() {
         pollBuild(startTime);
       })
       .catch(function(err) {
+        // Tilbake til steg 1 med feilmelding
+        document.getElementById('del-confirm-section-2').style.display = 'none';
+        document.getElementById('del-confirm-section').style.display = 'block';
         var errEl = document.getElementById('del-error');
         errEl.style.display = 'block';
-        errEl.textContent = 'Feil: ' + err.message;
+        errEl.textContent = (delLang === 'en' ? 'Error: ' : 'Feil: ') + err.message;
         confirmBtn.disabled = false;
         confirmBtn.textContent = delLang === 'en' ? 'Delete page' : 'Slett siden';
         cancelBtn.disabled = false;
+        finalBtn.disabled = false;
+        backBtn.disabled = false;
       });
-  });
+  }
 
   function deleteFilesInOneCommit(token, repo, paths, commitMsg) {
     var apiBase = 'https://api.github.com/repos/SAMT-X/' + repo;
