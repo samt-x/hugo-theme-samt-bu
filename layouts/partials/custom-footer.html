@@ -839,7 +839,7 @@ setTimeout(function() {
       'Content-Type': 'application/json'
     };
     var currentSha;
-    return fetch(apiBase + '/git/ref/heads/main', { headers: headers })
+    return fetch(apiBase + '/git/ref/heads/main', { headers: headers, cache: 'no-store' })
       .then(function(r) { return r.json(); })
       .then(function(ref) {
         currentSha = ref.object.sha;
@@ -1045,7 +1045,7 @@ setTimeout(function() {
     var apiBase = 'https://api.github.com/repos/SAMT-X/' + repo;
     var h = { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' };
     var headSha;
-    return fetch(apiBase + '/git/ref/heads/main', { headers: h })
+    return fetch(apiBase + '/git/ref/heads/main', { headers: h, cache: 'no-store' })
       .then(function(r) { return r.json(); })
       .then(function(ref) {
         headSha = ref.object.sha;
