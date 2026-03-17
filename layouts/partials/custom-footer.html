@@ -265,6 +265,7 @@ function startGhPoll(startTime, onDone, onError, onStatus) {
           onStatus('Bygger…');
         } else if (run.status === 'completed') {
           if (run.conclusion === 'success') { samtuPlaySuccess(); onDone(); }
+          else if (run.conclusion === 'cancelled') { onStatus('Avløst – venter på nytt bygg…'); }
           else { samtuPlayFailure(); onError(run.conclusion); }
         }
       })
@@ -336,22 +337,26 @@ setTimeout(function() {
       .then(function(r) { return r.json(); })
       .then(function(data) {
         if (!data.workflow_runs) return;
-        var myCompleted = 0, totalActive = 0;
+        var myCompleted = 0, myCancelled = 0, totalActive = 0;
         for (var i = 0; i < data.workflow_runs.length; i++) {
           var run = data.workflow_runs[i];
           if (new Date(run.created_at).getTime() < p2.firstSaveAt - 30000) break;
           var isMine = !p2.actor || (run.triggering_actor && run.triggering_actor.login === p2.actor);
-          if (run.status === 'completed' && run.conclusion === 'success') {
-            if (isMine) myCompleted++;
+          if (run.status === 'completed') {
+            if (isMine) {
+              if (run.conclusion === 'success') myCompleted++;
+              else if (run.conclusion === 'cancelled') myCancelled++;
+            }
           } else if (run.status === 'queued' || run.status === 'in_progress') {
             totalActive++;
           }
         }
         // Oppdater indikator med totalteller for alle aktive bygg
         samtuShowPendingIndicatorWithTotal(p2.count, totalActive);
-        if (myCompleted > (p2.seenCompleted || 0)) {
+        // Minst én suksess og ingen aktive → alle endringer deployet (kansellerte avløst av siste bygg)
+        if (myCompleted > 0 && totalActive === 0) {
           clearInterval(resumeTimer);
-          samtuDecrementPending();
+          samtuClearPending();
           samtuShowDoneIndicator();
           samtuPlaySuccess();
           setTimeout(function() {
@@ -1723,71 +1728,108 @@ setTimeout(function() {
   }
 
   function statusIcon(run) {
-    if (run.status === 'in_progress' || run.status === 'queued')
+    if (run.status === 'in_progress')
       return '<i class="fa fa-spinner fa-spin" style="color:#7ec8e3;"></i>';
+    if (run.status === 'queued')
+      return '<i class="fa fa-clock-o" style="color:#aaa;"></i>';
     if (run.conclusion === 'success')
       return '<i class="fa fa-check-circle" style="color:#6dbf85;"></i>';
+    if (run.conclusion === 'cancelled')
+      return '<i class="fa fa-ban" style="color:#888;" title="Avløst av nyere bygg"></i>';
     return '<i class="fa fa-exclamation-circle" style="color:#e07070;"></i>';
   }
 
-  function loadHistory() {
-    listEl.innerHTML = '<div style="padding:10px 14px; opacity:.6;">' + (isEn ? 'Loading\u2026' : 'Laster\u2026') + '</div>';
+  var _historyRuns = null;
+  var _historyLiveTimer = null;
+  var _historyFetchTimer = null;
+
+  function renderHistory(runs) {
+    if (!runs.length) {
+      listEl.innerHTML = '<div style="padding:10px 14px; opacity:.6;">' + (isEn ? 'No jobs found.' : 'Ingen jobber funnet.') + '</div>';
+      return;
+    }
+    var html = '';
+    runs.forEach(function(run) {
+      var msg = run.display_title || run.name || '\u2013';
+      if (msg.length > 58) msg = msg.slice(0, 57) + '\u2026';
+      var time;
+      if (run.status === 'queued') {
+        time = isEn ? 'In queue' : 'I k\u00f8';
+      } else if (run.status === 'in_progress') {
+        var elapsedSec = Math.round((Date.now() - new Date(run.created_at).getTime()) / 1000);
+        time = elapsedSec + (isEn ? ' s' : ' sek');
+      } else if (run.conclusion === 'cancelled') {
+        time = isEn ? 'Superseded' : 'Avl\u00f8st';
+      } else {
+        time = timeAgo(run.updated_at);
+      }
+      html += '<div style="display:flex; align-items:center; gap:9px; padding:7px 12px; border-bottom:1px solid rgba(255,255,255,.06);">';
+      html += '<span style="flex-shrink:0; width:14px; text-align:center;">' + statusIcon(run) + '</span>';
+      html += '<span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + msg + '</span>';
+      html += '<span style="opacity:.5; font-size:12px; flex-shrink:0; white-space:nowrap; margin-left:6px;">' + time + '</span>';
+      html += '<a href="' + run.html_url + '" target="_blank" rel="noopener" title="' + (isEn ? 'Open in GitHub' : '\u00c5pne i GitHub') + '" style="color:#7ec8e3; text-decoration:none; flex-shrink:0; font-size:12px; opacity:.75; margin-left:4px;" onclick="event.stopPropagation();">\u2197</a>';
+      html += '</div>';
+    });
+    listEl.innerHTML = html;
+  }
+
+  function fetchHistory() {
+    if (!_historyRuns) {
+      listEl.innerHTML = '<div style="padding:10px 14px; opacity:.6;">' + (isEn ? 'Loading\u2026' : 'Laster\u2026') + '</div>';
+    }
     var token = getStoredToken();
     var login = localStorage.getItem('samt-bu-gh-user');
     var url   = 'https://api.github.com/repos/SAMT-X/samt-bu-docs/actions/workflows/hugo.yml/runs?per_page=15';
     if (login) url += '&actor=' + encodeURIComponent(login);
     var headers = { 'Accept': 'application/vnd.github+json' };
     if (token) headers['Authorization'] = 'token ' + token;
-
     fetch(url, { headers: headers, cache: 'no-store' })
       .then(function(r) { return r.json(); })
       .then(function(data) {
-        var runs = data.workflow_runs || [];
-        if (!runs.length) {
-          listEl.innerHTML = '<div style="padding:10px 14px; opacity:.6;">' + (isEn ? 'No jobs found.' : 'Ingen jobber funnet.') + '</div>';
-          return;
-        }
-        var html = '';
-        runs.forEach(function(run) {
-          var msg  = run.display_title || run.name || '\u2013';
-          if (msg.length > 58) msg = msg.slice(0, 57) + '\u2026';
-          var time = (run.status === 'in_progress' || run.status === 'queued')
-            ? (isEn ? 'running\u2026' : 'kj\u00f8rer\u2026')
-            : timeAgo(run.updated_at);
-          html += '<div style="display:flex; align-items:center; gap:9px; padding:7px 12px; border-bottom:1px solid rgba(255,255,255,.06);">';
-          html += '<span style="flex-shrink:0; width:14px; text-align:center;">' + statusIcon(run) + '</span>';
-          html += '<span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + msg + '</span>';
-          html += '<span style="opacity:.5; font-size:12px; flex-shrink:0; white-space:nowrap; margin-left:6px;">' + time + '</span>';
-          html += '<a href="' + run.html_url + '" target="_blank" rel="noopener" title="' + (isEn ? 'Open in GitHub' : '\u00c5pne i GitHub') + '" style="color:#7ec8e3; text-decoration:none; flex-shrink:0; font-size:12px; opacity:.75; margin-left:4px;" onclick="event.stopPropagation();">\u2197</a>';
-          html += '</div>';
-        });
-        listEl.innerHTML = html;
+        _historyRuns = data.workflow_runs || [];
+        renderHistory(_historyRuns);
       })
       .catch(function(err) {
         listEl.innerHTML = '<div style="padding:10px 14px; color:#e07070;">\u26a0 ' + err.message + '</div>';
       });
   }
 
+  function openHistory() {
+    dialog.style.display = 'block';
+    _historyRuns = null;
+    fetchHistory();
+    // Live elapsed-teller: re-render hvert sekund fra cache, re-fetch hvert 15. sek
+    _historyLiveTimer = setInterval(function() { if (_historyRuns) renderHistory(_historyRuns); }, 1000);
+    _historyFetchTimer = setInterval(fetchHistory, 15000);
+  }
+
+  function closeHistory() {
+    dialog.style.display = 'none';
+    clearInterval(_historyLiveTimer);
+    clearInterval(_historyFetchTimer);
+    _historyLiveTimer = null;
+    _historyFetchTimer = null;
+  }
+
   indicator.addEventListener('click', function(e) {
     // Ikke åpne dialog hvis klikket var på en lenke inne i indikatoren (f.eks. samtuShowDoneIndicator)
     if (e.target.tagName === 'A' || e.target.closest('a')) return;
     if (dialog.style.display !== 'none') {
-      dialog.style.display = 'none';
+      closeHistory();
     } else {
-      dialog.style.display = 'block';
-      loadHistory();
+      openHistory();
     }
   });
 
-  closeBtn.addEventListener('click', function() { dialog.style.display = 'none'; });
+  closeBtn.addEventListener('click', closeHistory);
 
   document.addEventListener('click', function(e) {
     if (dialog.style.display === 'none') return;
-    if (!dialog.contains(e.target) && !indicator.contains(e.target)) dialog.style.display = 'none';
+    if (!dialog.contains(e.target) && !indicator.contains(e.target)) closeHistory();
   });
 
   document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && dialog.style.display !== 'none') dialog.style.display = 'none';
+    if (e.key === 'Escape' && dialog.style.display !== 'none') closeHistory();
   });
 })();
 </script>
