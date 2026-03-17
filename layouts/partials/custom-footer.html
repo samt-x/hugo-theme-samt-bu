@@ -958,19 +958,20 @@ setTimeout(function() {
   var overlay = document.getElementById('del-overlay');
   if (!overlay) return;
 
-  var delRepo = '', delDirPath = '', delLang = 'nb', delTitle = '', delParentUrl = '';
+  var delRepo = '', delDirPath = '', delLang = 'nb', delTitle = '', delParentUrl = '', delChildCount = 0;
   var activePollTimer = null;
 
-  window.openDeleteDialog = function(repo, dirPath, lang, title, parentUrl) {
+  window.openDeleteDialog = function(repo, dirPath, lang, title, parentUrl, childCount) {
     delRepo = repo;
     delDirPath = dirPath;
     delLang = lang || 'nb';
     delTitle = (typeof title === 'string') ? title.replace(/^"(.*)"$/, '$1') : title;
     delParentUrl = parentUrl;
+    delChildCount = childCount || 0;
 
     if (!getStoredToken()) {
       doGitHubLogin(function() {
-        window.openDeleteDialog(repo, dirPath, lang, title, parentUrl);
+        window.openDeleteDialog(repo, dirPath, lang, title, parentUrl, childCount);
       });
       return;
     }
@@ -980,7 +981,22 @@ setTimeout(function() {
     document.getElementById('del-confirm-text').textContent =
       lang === 'en' ? 'Delete "' + title + '"?' : 'Vil du slette «' + title + '»?';
     document.getElementById('del-cancel').textContent = lang === 'en' ? 'Cancel' : 'Avbryt';
-    document.getElementById('del-confirm-btn').textContent = lang === 'en' ? 'Delete page' : 'Slett siden';
+    var warningEl = document.getElementById('del-children-warning');
+    if (delChildCount > 0) {
+      var subLabel = lang === 'en'
+        ? (delChildCount === 1 ? '1 sub-chapter' : delChildCount + ' sub-chapters')
+        : (delChildCount === 1 ? '1 underkapittel' : delChildCount + ' underkapitler');
+      warningEl.textContent = '\u26a0 ' + (lang === 'en'
+        ? 'This page has ' + subLabel + '. All sub-pages will also be deleted.'
+        : 'Denne siden har ' + subLabel + '. Alle underliggende sider slettes også.');
+      warningEl.style.display = 'block';
+      document.getElementById('del-confirm-btn').textContent = lang === 'en'
+        ? 'Delete page and ' + subLabel
+        : 'Slett siden og ' + subLabel;
+    } else {
+      warningEl.style.display = 'none';
+      document.getElementById('del-confirm-btn').textContent = lang === 'en' ? 'Delete page' : 'Slett siden';
+    }
     document.getElementById('del-confirm-btn').disabled = false;
     document.getElementById('del-cancel').disabled = false;
     document.getElementById('del-error').style.display = 'none';
@@ -1016,14 +1032,16 @@ setTimeout(function() {
     var enPath = delDirPath + '/_index.en.md';
 
     function tryDelCommit(attemptsLeft) {
-      return deleteFilesInOneCommit(token, delRepo, [nbPath, enPath], 'Slett side: ' + delTitle)
-        .catch(function(err) {
-          if (err.message === 'Update is not a fast forward' && attemptsLeft > 0) {
-            return new Promise(function(res) { setTimeout(res, 1500); })
-              .then(function() { return tryDelCommit(attemptsLeft - 1); });
-          }
-          throw err;
-        });
+      var doDelete = delChildCount > 0
+        ? deleteDirectoryRecursive(token, delRepo, delDirPath, 'Slett side: ' + delTitle)
+        : deleteFilesInOneCommit(token, delRepo, [nbPath, enPath], 'Slett side: ' + delTitle);
+      return doDelete.catch(function(err) {
+        if (err.message === 'Update is not a fast forward' && attemptsLeft > 0) {
+          return new Promise(function(res) { setTimeout(res, 1500); })
+            .then(function() { return tryDelCommit(attemptsLeft - 1); });
+        }
+        throw err;
+      });
     }
     tryDelCommit(2)
       .then(function() {
@@ -1055,6 +1073,44 @@ setTimeout(function() {
       .then(function(commit) {
         var items = paths.map(function(p) { return { path: p, mode: '100644', type: 'blob', sha: null }; });
         return fetch(apiBase + '/git/trees', { method: 'POST', headers: h, body: JSON.stringify({ base_tree: commit.tree.sha, tree: items }) });
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(tree) {
+        return fetch(apiBase + '/git/commits', { method: 'POST', headers: h, body: JSON.stringify({ message: commitMsg, tree: tree.sha, parents: [headSha] }) });
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(newCommit) {
+        return fetch(apiBase + '/git/refs/heads/main', { method: 'PATCH', headers: h, body: JSON.stringify({ sha: newCommit.sha }) });
+      })
+      .then(function(r) {
+        if (!r.ok) return r.json().then(function(j) { throw new Error(j.message || r.statusText); });
+        return r.json();
+      });
+  }
+
+  function deleteDirectoryRecursive(token, repo, dirPath, commitMsg) {
+    var apiBase = 'https://api.github.com/repos/SAMT-X/' + repo;
+    var h = { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' };
+    var prefix = dirPath + '/';
+    var headSha, baseTreeSha;
+    return fetch(apiBase + '/git/ref/heads/main', { headers: h, cache: 'no-store' })
+      .then(function(r) { return r.json(); })
+      .then(function(ref) {
+        headSha = ref.object.sha;
+        return fetch(apiBase + '/git/commits/' + headSha, { headers: h });
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(commit) {
+        baseTreeSha = commit.tree.sha;
+        return fetch(apiBase + '/git/trees/' + baseTreeSha + '?recursive=1', { headers: h });
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(treeData) {
+        var items = (treeData.tree || [])
+          .filter(function(e) { return e.type === 'blob' && e.path.indexOf(prefix) === 0; })
+          .map(function(e) { return { path: e.path, mode: e.mode, type: 'blob', sha: null }; });
+        if (!items.length) throw new Error('No files found under ' + prefix);
+        return fetch(apiBase + '/git/trees', { method: 'POST', headers: h, body: JSON.stringify({ base_tree: baseTreeSha, tree: items }) });
       })
       .then(function(r) { return r.json(); })
       .then(function(tree) {

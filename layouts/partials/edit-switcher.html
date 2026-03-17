@@ -141,7 +141,7 @@
     {{ end }}
     {{ if and .File (ne $entrySlug "") (ne $dirPath "content") }}
     <li style="border-top:1px solid #f5e0e0; margin-top:3px; padding-top:3px;">
-      <a href="#" onclick="openDeleteDialog('{{ $githubRepo }}', '{{ $dirPath }}', '{{ $lang }}', {{ .Title | jsonify }}, '{{ $afterDeleteUrl }}'); return false;" style="color:#b00020;">
+      <a href="#" onclick="openDeleteDialog('{{ $githubRepo }}', '{{ $dirPath }}', '{{ $lang }}', {{ .Title | jsonify }}, '{{ $afterDeleteUrl }}', {{ len .Pages }}); return false;" style="color:#b00020;">
         <i class="fa fa-trash-o"></i>
         <span>{{ cond (eq $lang "en") "Delete this page" "Slett denne siden" }}</span>
       </a>
@@ -161,6 +161,7 @@
       {{/* Bekreftelsesdel */}}
       <div id="del-confirm-section">
         <p id="del-confirm-text" style="margin:0 0 .6rem;"></p>
+        <div id="del-children-warning" style="display:none; margin:.5rem 0 .6rem; padding:.6rem .8rem; border-radius:4px; background:#fff3cd; border:1px solid #f0c040; color:#7a5400; font-size:.95rem;"></div>
         <p style="margin:0 0 1.25rem; font-size:.9rem; color:#888;">Begge språkversjoner (nb + en) slettes. Dette kan ikke angres.</p>
         <div id="del-error" style="display:none; margin-bottom:.9rem; padding:.65rem .8rem; border-radius:4px; background:#fff0f0; border:1px solid #f5c6c6; color:#900; font-size:.95rem;"></div>
         <div style="display:flex; gap:.6rem; justify-content:flex-end;">
