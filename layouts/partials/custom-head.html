@@ -1,5 +1,13 @@
 <!-- Partial intended to be overwritten to add CSS -->
 <style>
+  /* DIN-font-aliaser – mapper DIN-navnene fra designsystem.css og theme.css til system-Arial.
+     DIN-bold → Arial Bold (visuelt bold), DIN-reg/medium/light → Arial normal.
+     Nødvendig fordi fontfilene ikke finnes i repoet. */
+  @font-face { font-family: 'DIN-bold';   src: local('Arial Bold'), local('Arial-BoldMT'), local('Arial'); font-weight: normal; font-style: normal; }
+  @font-face { font-family: 'DIN-medium'; src: local('Arial'), local('Helvetica Neue'); font-weight: normal; font-style: normal; }
+  @font-face { font-family: 'DIN-reg';    src: local('Arial'), local('Helvetica Neue'); font-weight: normal; font-style: normal; }
+  @font-face { font-family: 'DIN-light';  src: local('Arial'), local('Helvetica Neue'); font-weight: normal; font-style: normal; }
+
   /* Language switcher */
   .lang-switcher {
     position: relative;
