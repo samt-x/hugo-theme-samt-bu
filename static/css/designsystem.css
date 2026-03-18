@@ -13718,6 +13718,8 @@ blockquote::before, blockquote::after {
 .a-blueDarkerText {
   color: #022F51; }
 
+/* DIN-webfonter kommentert ut – fontfilene finnes ikke i repoet og gir 404-feil.
+   Nettstedet bruker Helvetica/Arial definert i custom-head.html.
 @font-face {
   font-family: 'DIN-light';
   src: url("../fonts/DINWeb-Light.woff"); }
@@ -13733,6 +13735,7 @@ blockquote::before, blockquote::after {
 @font-face {
   font-family: 'DIN-bold';
   src: url("../fonts/DINWeb-Bold.woff"); }
+*/
 
 a[href^="http"]:not([href*='altinn.no']):not([href*='basefarm.net']):not([href*='local.altinn'])::after {
   display: inline-block;
