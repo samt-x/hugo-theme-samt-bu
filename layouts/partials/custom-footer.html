@@ -1636,23 +1636,21 @@ setTimeout(function() {
   function createQeCommit(token, repo, filePath, content, blobItems, message) {
     var apiBase = 'https://api.github.com/repos/SAMT-X/' + repo;
     var h = { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' };
+    function checkOk(r) { if (!r.ok) return r.json().then(function(j) { throw new Error(j.message || r.statusText); }); return r.json(); }
     var headSha;
     return fetch(apiBase + '/git/ref/heads/main', { headers: h, cache: 'no-store' })
-      .then(function(r) { return r.json(); })
+      .then(checkOk)
       .then(function(ref) { headSha = ref.object.sha; return fetch(apiBase + '/git/commits/' + headSha, { headers: h, cache: 'no-store' }); })
-      .then(function(r) { return r.json(); })
+      .then(checkOk)
       .then(function(commit) {
         var items = [{ path: filePath, mode: '100644', type: 'blob', content: content }].concat(blobItems || []);
         return fetch(apiBase + '/git/trees', { method: 'POST', headers: h, body: JSON.stringify({ base_tree: commit.tree.sha, tree: items }) });
       })
-      .then(function(r) { return r.json(); })
+      .then(checkOk)
       .then(function(tree) { return fetch(apiBase + '/git/commits', { method: 'POST', headers: h, body: JSON.stringify({ message: message, tree: tree.sha, parents: [headSha] }) }); })
-      .then(function(r) { return r.json(); })
+      .then(checkOk)
       .then(function(commit) { return fetch(apiBase + '/git/refs/heads/main', { method: 'PATCH', headers: h, body: JSON.stringify({ sha: commit.sha }) }); })
-      .then(function(r) {
-        if (!r.ok) return r.json().then(function(j) { throw new Error(j.message || r.statusText); });
-        return r.json();
-      });
+      .then(checkOk);
   }
 })();
 </script>
