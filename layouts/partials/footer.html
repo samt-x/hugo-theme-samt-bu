@@ -52,25 +52,8 @@
               {{ $File := .File }}
               {{ $Site := .Site }}
               {{with $File.Path }}
-                {{ $fp := replace $File.Path "\\" "/" }}
-                {{ $ghEditURL := "" }}
-                {{ if hasPrefix $fp "teams/team-architecture/" }}
-                  {{ $rel := strings.TrimPrefix "teams/team-architecture/" $fp }}
-                  {{ $ghEditURL = printf "https://github.com/SAMT-X/team-architecture/edit/main/content/%s" $rel }}
-                {{ else if hasPrefix $fp "teams/team-semantics/" }}
-                  {{ $rel := strings.TrimPrefix "teams/team-semantics/" $fp }}
-                  {{ $ghEditURL = printf "https://github.com/SAMT-X/team-semantics/edit/main/content/%s" $rel }}
-                {{ else if hasPrefix $fp "utkast/" }}
-                  {{ $rel := strings.TrimPrefix "utkast/" $fp }}
-                  {{ $ghEditURL = printf "https://github.com/SAMT-X/samt-bu-drafts/edit/main/content/%s" $rel }}
-                {{ else if hasPrefix $fp "loesninger/cms-loesninger/samt-bu-docs/" }}
-                  {{ $rel := strings.TrimPrefix "loesninger/cms-loesninger/samt-bu-docs/" $fp }}
-                  {{ $ghEditURL = printf "https://github.com/SAMT-X/solution-samt-bu-docs/edit/main/content/%s" $rel }}
-                {{ else }}
-                  {{ $ghEditURL = printf "%s%s%s" $Site.Params.editURL (replace $File.Dir "\\" "/") $File.LogicalName }}
-                {{ end }}
                 <div id="top-github-link">
-                  <a class="" href="{{ $ghEditURL }}" target="blank">
+                  <a class="" href="{{ $Site.Params.editURL }}{{ replace $File.Dir "\\" "/" }}{{ $File.LogicalName }}" target="blank">
                     <i class="fa fa-code-fork"></i>
                     {{T "Edit-this-page"}}
                   </a>
