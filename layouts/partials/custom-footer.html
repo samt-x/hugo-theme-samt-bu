@@ -400,14 +400,6 @@ setTimeout(function() {
             return;
           }
 
-          // Ellers: vis mellomtilstand og poll til ETag faktisk endres
-          var cfDoneInd = document.getElementById('qe-job-indicator');
-          if (cfDoneInd) {
-            cfDoneInd.innerHTML = '<i class="fa fa-spinner fa-spin" style="font-size:12px; opacity:.85;"></i>' +
-              '<span style="margin-left:7px;">' + (cfDoneLang ? 'Publishing to CDN\u2026' : 'Publiserer til CDN\u2026') + '</span>';
-            cfDoneInd.dataset.building = '1';
-            cfDoneInd.style.display = 'flex';
-          }
           // Build-time content poll (CF Pages returnerer ingen ETag/Last-Modified)
           var cfAttempts = 0;
           var cfSavedBuildTime = p2.buildTime || '';
