@@ -133,6 +133,30 @@ function samtuDecrementPending() {
 function samtuClearPending() {
   try { localStorage.removeItem(SAMTU_PENDING_KEY); } catch(e) {}
 }
+// Lokal byggehistorikk (varighet per bygg, knyttes til GH Actions-run via created_at)
+var SAMTU_BUILD_HISTORY_KEY = 'samtu-build-history';
+function samtuStoreBuildTime(firstSaveAt, totalMs) {
+  if (!firstSaveAt || !totalMs || totalMs < 1000) return;
+  try {
+    var history = JSON.parse(localStorage.getItem(SAMTU_BUILD_HISTORY_KEY) || '[]');
+    for (var i = 0; i < history.length; i++) {
+      if (Math.abs(history[i].at - firstSaveAt) < 10000) return; // allerede lagret
+    }
+    history.unshift({ at: firstSaveAt, totalMs: totalMs });
+    if (history.length > 30) history.pop();
+    localStorage.setItem(SAMTU_BUILD_HISTORY_KEY, JSON.stringify(history));
+  } catch(e) {}
+}
+function samtuLookupBuildTime(runCreatedAt) {
+  try {
+    var history = JSON.parse(localStorage.getItem(SAMTU_BUILD_HISTORY_KEY) || '[]');
+    var runAt = new Date(runCreatedAt).getTime();
+    for (var i = 0; i < history.length; i++) {
+      if (Math.abs(history[i].at - runAt) < 30000) return history[i].totalMs;
+    }
+  } catch(e) {}
+  return null;
+}
 function samtuShowPendingIndicator(count) {
   samtuShowPendingIndicatorWithTotal(count, null);
 }
@@ -362,6 +386,7 @@ setTimeout(function() {
           function fireCfDone() {
             if (window._samtuDoneFired) return;
             window._samtuDoneFired = true;
+            samtuStoreBuildTime(p2.firstSaveAt, Date.now() - p2.firstSaveAt);
             samtuClearPending();
             samtuShowDoneIndicator();
             samtuPlaySuccess();
@@ -1615,6 +1640,7 @@ setTimeout(function() {
 
     function onBuildDone() {
       window._samtuDoneFired = true;
+      samtuStoreBuildTime(startTime, Date.now() - startTime);
       clearInterval(qePollTimer); qePollTimer = null;
       samtuDecrementPending();
       if (overlay.style.display !== 'none') {
@@ -1869,6 +1895,15 @@ setTimeout(function() {
     return Math.floor(secs / 86400) + (isEn ? ' d ago' : ' d siden');
   }
 
+  function formatTimestamp(dateStr) {
+    var d = new Date(dateStr);
+    var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+    var yy = pad(d.getFullYear() % 100);
+    var date = yy + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    var time = pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+    return '<span style="display:block;">' + date + '</span><span style="display:block;">' + time + '</span>';
+  }
+
   function statusIcon(run) {
     if (run.status === 'in_progress')
       return '<i class="fa fa-spinner fa-spin" style="color:#7ec8e3;"></i>';
@@ -1934,21 +1969,32 @@ setTimeout(function() {
         time = isEn ? 'In queue' : 'I k\u00f8';
       } else if (run.status === 'in_progress') {
         var elapsedSec = Math.round((Date.now() - new Date(run.created_at).getTime()) / 1000);
-        time = elapsedSec + (isEn ? ' s' : ' sek');
+        time = elapsedSec + 's';
       } else if (run.conclusion === 'cancelled') {
         time = isEn ? 'Superseded' : 'Avl\u00f8st';
+      } else if (run.conclusion === 'success') {
+        var storedMs = samtuLookupBuildTime(run.created_at);
+        if (storedMs) {
+          var totalSec = Math.round(storedMs / 1000);
+          time = totalSec >= 60
+            ? Math.floor(totalSec / 60) + 'min ' + (totalSec % 60) + 's'
+            : totalSec + 's';
+        } else {
+          time = timeAgo(run.updated_at);
+        }
       } else {
         time = timeAgo(run.updated_at);
       }
-      html += '<div style="display:flex; align-items:flex-start; gap:9px; padding:6px 12px; border-bottom:1px solid rgba(255,255,255,.06);">';
+      html += '<div style="display:flex; align-items:flex-start; gap:7px; padding:6px 12px; border-bottom:1px solid rgba(255,255,255,.06);">';
       html += '<span style="flex-shrink:0; width:14px; text-align:center; margin-top:2px;">' + statusIcon(run) + '</span>';
+      html += '<span style="flex-shrink:0; font-size:10px; opacity:.45; white-space:nowrap; font-family:monospace; line-height:1.35; text-align:right; margin-top:1px;">' + formatTimestamp(run.created_at) + '</span>';
       html += '<span style="flex:1; min-width:0; overflow:hidden;">';
       html += '<span style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + msg + '</span>';
       if (showActor && login) {
         html += '<span style="display:block; font-size:11px; opacity:.45; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + actorLabel(login) + '</span>';
       }
       html += '</span>';
-      html += '<span style="opacity:.5; font-size:12px; flex-shrink:0; white-space:nowrap; margin-left:6px; padding-top:2px;">' + time + '</span>';
+      html += '<span style="opacity:.5; font-size:12px; flex-shrink:0; white-space:nowrap; margin-left:4px; padding-top:2px;">' + time + '</span>';
       html += '<a href="' + run.html_url + '" target="_blank" rel="noopener" title="' + (isEn ? 'Open in GitHub' : '\u00c5pne i GitHub') + '" style="color:#7ec8e3; text-decoration:none; flex-shrink:0; font-size:12px; opacity:.75; margin-left:4px; padding-top:2px;" onclick="event.stopPropagation();">\u2197</a>';
       html += '</div>';
     });
