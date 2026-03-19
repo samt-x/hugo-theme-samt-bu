@@ -1809,9 +1809,7 @@ setTimeout(function() {
       var maxLen = showActor ? 52 : 58;
       if (msg.length > maxLen) msg = msg.slice(0, maxLen - 1) + '\u2026';
       var time;
-      if (run.status === 'queued' || run.status === 'waiting' || run.status === 'pending' || run.status === 'requested') {
-        time = isEn ? 'In queue' : 'I k\u00f8';
-      } else if (run.status === 'in_progress') {
+      if (run.status === 'queued' || run.status === 'waiting' || run.status === 'pending' || run.status === 'requested' || run.status === 'in_progress') {
         time = fmtSec(Math.round((Date.now() - new Date(run.created_at).getTime()) / 1000));
       } else if (run.conclusion === 'cancelled') {
         time = isEn ? 'Superseded' : 'Avl\u00f8st';
