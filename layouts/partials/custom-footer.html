@@ -1627,17 +1627,9 @@ setTimeout(function() {
       var w = document.getElementById('qe-build-warning');
       if (w) w.style.display = 'none';
       samtuIncrementPending();
-      var commitSha = commitResult && commitResult.sha || null;
-      if (commitResult && commitResult.repo !== 'samt-bu-docs' && commitSha) {
-        // Modulrepo: hent samt-bu-docs HEAD for CF check-run-sporing
-        var mh = { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github+json' };
-        fetch('https://api.github.com/repos/SAMT-X/samt-bu-docs/git/ref/heads/main', { headers: mh, cache: 'no-store' })
-          .then(function(r) { return r.json(); })
-          .then(function(ref) { pollQeBuild(startTime, ref.object && ref.object.sha || null); })
-          .catch(function() { pollQeBuild(startTime, null); });
-      } else {
-        pollQeBuild(startTime, commitSha);
-      }
+      // SHA-basert polling virker ikke med wrangler deploy (ingen check-runs lages).
+      // Bruker alltid _samtuBuildTime-poll. SHA-routing kan gjeninnføres ved CF Git-integrasjon.
+      pollQeBuild(startTime, null);
     }
 
     function tryCommit(blobItems, deadline) {
