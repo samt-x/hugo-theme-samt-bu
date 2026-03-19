@@ -401,8 +401,14 @@ setTimeout(function() {
           }
 
           // Build-time content poll (CF Pages returnerer ingen ETag/Last-Modified)
+          // Hent fersk baseline nå (etter GH er ferdig) – ikke fra sideload-tidspunkt,
+          // siden en tidligere CF-deploy kan ha endret _samtuBuildTime siden da.
           var cfAttempts = 0;
-          var cfSavedBuildTime = p2.buildTime || '';
+          var cfSavedBuildTime = '';
+          fetch(cfDoneUrl, { cache: 'no-store' })
+            .then(function(r) { return r.text(); })
+            .then(function(html) { var m = html.match(/window\._samtuBuildTime=(\d+)/); if (m) cfSavedBuildTime = m[1]; })
+            .catch(function() {});
           var cfTimer = setInterval(function() {
             if (++cfAttempts > 60) { clearInterval(cfTimer); fireCfDone(); return; }
             fetch(cfDoneUrl + '?_cf=' + Date.now(), { cache: 'no-store' })
@@ -1655,8 +1661,14 @@ setTimeout(function() {
     }
 
     // Build-time content poll (CF Pages returnerer ingen ETag/Last-Modified)
+    // Hent fersk baseline nå – ikke window._samtuBuildTime fra sideload, som kan
+    // allerede ha endret seg pga. en tidligere CF-deploy.
     samtuPlayStart();
-    var savedBuildTime = (window._samtuBuildTime ? String(window._samtuBuildTime) : '');
+    var savedBuildTime = '';
+    fetch(url, { cache: 'no-store' })
+      .then(function(r) { return r.text(); })
+      .then(function(html) { var m = html.match(/window\._samtuBuildTime=(\d+)/); if (m) savedBuildTime = m[1]; })
+      .catch(function() {});
     qePollTimer = setInterval(function() {
       if (++attempts > 120) { clearInterval(qePollTimer); qePollTimer = null; samtuPlayFailure(); setStatus('⚠ Tidsavbrudd'); return; }
       fetch(url + (url.indexOf('?') >= 0 ? '&' : '?') + '_cf=' + Date.now(), { cache: 'no-store' })
