@@ -2023,9 +2023,15 @@ setTimeout(function() {
     dialog.style.display = 'block';
     _historyRuns = null;
     fetchHistory();
-    // Live elapsed-teller: re-render hvert sekund fra cache, re-fetch hvert 15. sek
+    // Live elapsed-teller: re-render hvert sekund fra cache
     _historyLiveTimer = setInterval(function() { if (_historyRuns) renderHistory(_historyRuns); }, 1000);
-    _historyFetchTimer = setInterval(fetchHistory, 15000);
+    // Adaptivt re-fetch: hvert 3s ved aktive bygg, hvert 15s ellers
+    var _historyFetchTick = 0;
+    _historyFetchTimer = setInterval(function() {
+      _historyFetchTick++;
+      var hasPending = !!(samtuGetPending() || {}).count;
+      if (hasPending || _historyFetchTick % 5 === 0) { fetchHistory(); }
+    }, 3000);
   }
 
   function closeHistory() {
