@@ -353,15 +353,44 @@ setTimeout(function() {
         }
         // Oppdater indikator med totalteller for alle aktive bygg
         samtuShowPendingIndicatorWithTotal(p2.count, totalActive);
-        // Minst én suksess og ingen aktive → alle endringer deployet (kansellerte avløst av siste bygg)
+        // Minst én suksess og ingen aktive → GH Actions ferdig, vent på at CF Pages publiserer
         if (myCompleted > 0 && totalActive === 0) {
           clearInterval(resumeTimer);
-          samtuClearPending();
-          samtuShowDoneIndicator();
-          samtuPlaySuccess();
-          setTimeout(function() {
-            window.location.href = window.location.href.split('?')[0] + '?_=' + Date.now();
-          }, 1800);
+          var cfDoneUrl = window.location.href.split('?')[0];
+          var cfDoneLang = document.documentElement.lang === 'en';
+          var cfDoneInd = document.getElementById('qe-job-indicator');
+          if (cfDoneInd) {
+            cfDoneInd.innerHTML = '<i class="fa fa-spinner fa-spin" style="font-size:12px; opacity:.85;"></i>' +
+              '<span style="margin-left:7px;">' + (cfDoneLang ? 'Publishing to CDN\u2026' : 'Publiserer til CDN\u2026') + '</span>';
+            cfDoneInd.dataset.building = '1';
+            cfDoneInd.style.display = 'flex';
+          }
+          function fireCfDone() {
+            if (window._samtuDoneFired) return;
+            window._samtuDoneFired = true;
+            samtuClearPending();
+            samtuShowDoneIndicator();
+            samtuPlaySuccess();
+            setTimeout(function() { window.location.href = cfDoneUrl + '?_=' + Date.now(); }, 1800);
+          }
+          var cfBaseEtag = null;
+          var cfAttempts = 0;
+          fetch(cfDoneUrl, { method: 'HEAD', cache: 'no-store' })
+            .then(function(r) { cfBaseEtag = r.headers.get('etag') || r.headers.get('last-modified'); })
+            .catch(function() {});
+          var cfTimer = setInterval(function() {
+            if (++cfAttempts > 120) { clearInterval(cfTimer); fireCfDone(); return; }
+            fetch(cfDoneUrl + '?_cf=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
+              .then(function(r) {
+                var newEtag = r.headers.get('etag') || r.headers.get('last-modified');
+                if (!cfBaseEtag && newEtag) { cfBaseEtag = newEtag; return; }
+                if (newEtag && cfBaseEtag && newEtag !== cfBaseEtag) {
+                  clearInterval(cfTimer);
+                  fireCfDone();
+                }
+              })
+              .catch(function() {});
+          }, 2000);
         }
       })
       .catch(function() {});
@@ -1577,6 +1606,7 @@ setTimeout(function() {
     function doNav() { window.location.href = url + '?_=' + Date.now(); }
 
     function onBuildDone() {
+      window._samtuDoneFired = true;
       clearInterval(qePollTimer); qePollTimer = null;
       samtuDecrementPending();
       if (overlay.style.display !== 'none') {
