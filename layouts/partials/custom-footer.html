@@ -1956,6 +1956,7 @@ setTimeout(function() {
   var _historyLiveTimer = null;
   var _historyFetchTimer = null;
   var _userNameCache = {}; // login -> display name string or null
+  var _cfRunCache = {};   // head_sha -> { status, started_at } fra CF Pages check-run
 
   function fmtSec(totalSec) {
     if (totalSec < 60) return totalSec + 's';
@@ -1985,8 +1986,13 @@ setTimeout(function() {
       return '<i class="fa fa-clock-o" style="color:#aaa;"></i>';
     if (run.conclusion === 'success') {
       var cfDone = samtuLookupBuildTime(run.created_at);
+      if (cfDone) return '<i class="fa fa-check-circle" style="color:#6dbf85;"></i>';
       var isRecent = (Date.now() - new Date(run.created_at).getTime()) < 600000;
-      if (!cfDone && isRecent)
+      if (!isRecent) return '<i class="fa fa-check-circle" style="color:#6dbf85;"></i>';
+      var cf = _cfRunCache[run.head_sha];
+      if (!cf || cf.status === 'pending' || cf.status === 'queued')
+        return '<i class="fa fa-clock-o" style="color:#aaa;" title="Venter i CF Pages-k\u00f8"></i>';
+      if (cf.status === 'in_progress')
         return '<i class="fa fa-spinner fa-spin" style="color:#7ec8e3; opacity:.7;" title="CF Pages deployer\u2026"></i>';
       return '<i class="fa fa-check-circle" style="color:#6dbf85;"></i>';
     }
@@ -2052,9 +2058,18 @@ setTimeout(function() {
         time = isEn ? 'Superseded' : 'Avl\u00f8st';
       } else if (run.conclusion === 'success') {
         var storedMs = samtuLookupBuildTime(run.created_at);
-        time = storedMs
-          ? fmtSec(Math.round(storedMs / 1000))
-          : fmtSec(Math.round((Date.now() - new Date(run.updated_at).getTime()) / 1000));
+        if (storedMs) {
+          time = fmtSec(Math.round(storedMs / 1000));
+        } else {
+          var cf = _cfRunCache[run.head_sha];
+          if (cf && cf.status === 'in_progress' && cf.started_at) {
+            time = fmtSec(Math.round((Date.now() - new Date(cf.started_at).getTime()) / 1000));
+          } else if (!cf || cf.status === 'pending' || cf.status === 'queued') {
+            time = isEn ? 'In queue' : 'I k\u00f8';
+          } else {
+            time = fmtSec(Math.round((Date.now() - new Date(run.updated_at).getTime()) / 1000));
+          }
+        }
       } else {
         time = timeAgo(run.updated_at);
       }
@@ -2074,7 +2089,7 @@ setTimeout(function() {
     listEl.innerHTML = html;
   }
 
-  // Hent CF check-run-varighet for vellykkede runs uten lagret tid (direktepush osv.)
+  // Hent CF Pages check-run-status for en run og oppdater cache + historikk
   function fetchCfRunDuration(run) {
     var tok = getStoredToken();
     var h = { 'Accept': 'application/vnd.github+json' };
@@ -2083,15 +2098,19 @@ setTimeout(function() {
           { headers: h, cache: 'no-store' })
       .then(function(r) { return r.json(); })
       .then(function(data) {
-        var cfRun = (data.check_runs || []).find(function(r) {
-          return r.name === 'Cloudflare Pages' && r.status === 'completed' && r.started_at && r.completed_at;
-        });
-        if (!cfRun) return;
-        var durationMs = new Date(cfRun.completed_at).getTime() - new Date(run.created_at).getTime();
-        if (durationMs > 0) {
-          samtuStoreBuildTime(new Date(run.created_at).getTime(), durationMs);
-          if (_historyRuns) renderHistory(_historyRuns);
+        var cfRun = (data.check_runs || []).find(function(r) { return r.name === 'Cloudflare Pages'; });
+        var prevStatus = (_cfRunCache[run.head_sha] || {}).status;
+        if (!cfRun) {
+          _cfRunCache[run.head_sha] = { status: 'pending' };
+        } else {
+          _cfRunCache[run.head_sha] = { status: cfRun.status, conclusion: cfRun.conclusion, started_at: cfRun.started_at };
+          if (cfRun.status === 'completed' && cfRun.conclusion === 'success' && cfRun.started_at && cfRun.completed_at) {
+            var durationMs = new Date(cfRun.completed_at).getTime() - new Date(run.created_at).getTime();
+            if (durationMs > 0) samtuStoreBuildTime(new Date(run.created_at).getTime(), durationMs);
+          }
         }
+        var newStatus = (_cfRunCache[run.head_sha] || {}).status;
+        if (newStatus !== prevStatus && _historyRuns) renderHistory(_historyRuns);
       })
       .catch(function() {});
   }
