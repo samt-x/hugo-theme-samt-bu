@@ -160,6 +160,24 @@ function samtuShowDoneIndicator() {
   ind.removeAttribute('data-building');
   ind.style.display = 'flex';
 }
+// Viser diskret indikator for eksternt bygg (ikke eget – ingen teller, lavere opasitet)
+function samtuShowExternalBuildIndicator() {
+  var ind = document.getElementById('qe-job-indicator');
+  if (!ind || ind.dataset.building) return; // eget bygg pågår – ikke overstyr
+  var isEn = document.documentElement.lang === 'en';
+  ind.innerHTML = '<i class="fa fa-spinner fa-spin" style="font-size:12px; opacity:.7;"></i>'
+    + '<span style="margin-left:7px; opacity:.7;">'
+    + (isEn ? 'Site updating\u2026' : 'Nettstedet oppdateres\u2026')
+    + '</span>';
+  ind.dataset.external = '1';
+  ind.style.display = 'flex';
+}
+function samtuHideExternalBuildIndicator() {
+  var ind = document.getElementById('qe-job-indicator');
+  if (!ind || !ind.dataset.external) return;
+  ind.style.display = 'none';
+  delete ind.dataset.external;
+}
 
 // Lydsignal ved ferdig bygg – beep (Web Audio) + tale (Web Speech)
 // Chrome blokkerer AudioContext og speechSynthesis fra setInterval uten brukergestus.
@@ -1747,6 +1765,62 @@ setTimeout(function() {
   var pageUrl = window.location.href.split('?')[0];
   var knownEtag = null;
   var bgTimer = null;
+  var bgExternalRun = null; // ID på eksternt bygg vi følger
+  var bgFastTimer = null;   // Rask ETag-poll (5s) mens eksternt bygg pågår
+
+  // Stopp rask poll og fjern ekstern-indikator
+  function stopBgFastPoll() {
+    if (bgFastTimer) { clearInterval(bgFastTimer); bgFastTimer = null; }
+    bgExternalRun = null;
+    samtuHideExternalBuildIndicator();
+  }
+
+  // Start rask ETag-poll (5s) for å oppdage at eksternt bygg er ferdig
+  function startBgFastPoll() {
+    if (bgFastTimer) return; // allerede aktiv
+    bgFastTimer = setInterval(function() {
+      var qeInd = document.getElementById('qe-job-indicator');
+      if (qeInd && qeInd.dataset.building) { stopBgFastPoll(); return; } // eget bygg startet
+      fetch(pageUrl + '?_bgf=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
+        .then(function(r) {
+          var newEtag = r.headers.get('etag') || r.headers.get('last-modified');
+          if (newEtag && knownEtag && newEtag !== knownEtag) {
+            knownEtag = newEtag;
+            stopBgFastPoll();
+            clearInterval(bgTimer);
+            window.location.href = pageUrl + '?_=' + Date.now(); // auto-last inn
+          }
+        })
+        .catch(function() {});
+    }, 5000);
+  }
+
+  // Sjekk GitHub Actions API for aktive bygg som ikke er egne (krever innlogget bruker)
+  function checkExternalBuilds() {
+    var p = samtuGetPending();
+    if (p && p.count) { stopBgFastPoll(); return; } // eget bygg pågår – ikke interferér
+    var token = getStoredToken();
+    if (!token) { stopBgFastPoll(); return; } // ikke innlogget – kan ikke sjekke API
+    var h = { 'Accept': 'application/vnd.github+json', 'Authorization': 'token ' + token };
+    fetch('https://api.github.com/repos/SAMT-X/samt-bu-docs/actions/workflows/hugo.yml/runs?per_page=3', { headers: h })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.workflow_runs) return;
+        var activeRun = null;
+        for (var i = 0; i < data.workflow_runs.length; i++) {
+          var run = data.workflow_runs[i];
+          if (run.status === 'in_progress' || run.status === 'queued') { activeRun = run; break; }
+        }
+        if (activeRun) {
+          bgExternalRun = activeRun.id;
+          samtuShowExternalBuildIndicator();
+          startBgFastPoll();
+        } else {
+          stopBgFastPoll();
+        }
+      })
+      .catch(function() {});
+  }
 
   // Hent initial ETag etter at siden er ferdig lastet
   setTimeout(function() {
@@ -1767,19 +1841,26 @@ setTimeout(function() {
         if (newEtag && newEtag !== knownEtag) {
           var p = samtuGetPending();
           var tooSoon = p && p.count && p.lastSaveAt && (Date.now() - p.lastSaveAt) < 60000;
-          if (tooSoon) return; // for tidlig – bygg inkluderer kanskje ikke siste endring ennå
+          if (tooSoon) { checkExternalBuilds(); return; } // for tidlig – sjekk likevel
           knownEtag = newEtag;
           clearInterval(bgTimer);
           if (p && p.count) {
             // Egne ventende endringer – dekrement og last inn
             samtuDecrementPending();
             window.location.href = window.location.href.split('?')[0] + '?_=' + Date.now();
+          } else if (bgExternalRun) {
+            // Eksternt bygg er ferdig – auto-last inn (ikke banner)
+            stopBgFastPoll();
+            window.location.href = pageUrl + '?_=' + Date.now();
           } else {
-            // Andres endring – vis generelt oppdateringsbanner
+            // Ukjent endring – vis oppdateringsbanner
             var banner = document.getElementById('page-update-banner');
             if (banner) banner.style.display = 'flex';
           }
+          return;
         }
+        // ETag uendret – sjekk for aktive eksterne bygg
+        checkExternalBuilds();
       })
       .catch(function() {});
   }, 45000);
