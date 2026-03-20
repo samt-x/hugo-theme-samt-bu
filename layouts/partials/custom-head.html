@@ -1,5 +1,19 @@
 <!-- Partial intended to be overwritten to add CSS -->
 <style>
+  /* DIN-font-aliaser – mapper DIN-navnene fra designsystem.css og theme.css til system-Arial.
+     To sett per navn: normal + bold – slik at strong/b som arver DIN-familien også får Arial Bold.
+     Nødvendig fordi fontfilene ikke finnes i repoet. */
+  @font-face { font-family: 'DIN-bold';   src: local('Arial Bold'), local('Arial-BoldMT'), local('Arial'); font-weight: normal; font-style: normal; }
+  @font-face { font-family: 'DIN-bold';   src: local('Arial Bold'), local('Arial-BoldMT'), local('Arial'); font-weight: bold;   font-style: normal; }
+  @font-face { font-family: 'DIN-medium'; src: local('Arial'), local('Helvetica Neue'); font-weight: normal; font-style: normal; }
+  @font-face { font-family: 'DIN-medium'; src: local('Arial Bold'), local('Arial-BoldMT'); font-weight: bold; font-style: normal; }
+  @font-face { font-family: 'DIN-reg';    src: local('Arial'), local('Helvetica Neue'); font-weight: normal; font-style: normal; }
+  @font-face { font-family: 'DIN-reg';    src: local('Arial Bold'), local('Arial-BoldMT'); font-weight: bold; font-style: normal; }
+  @font-face { font-family: 'DIN-light';  src: local('Arial'), local('Helvetica Neue'); font-weight: normal; font-style: normal; }
+  @font-face { font-family: 'DIN-light';  src: local('Arial Bold'), local('Arial-BoldMT'); font-weight: bold; font-style: normal; }
+  /* Failsafe: sørg for at strong/b alltid bruker Arial bold uansett arvet font-family */
+  strong, b { font-family: Arial, Helvetica, sans-serif !important; font-weight: bold !important; }
+
   /* Language switcher */
   .lang-switcher {
     position: relative;
@@ -194,6 +208,7 @@
   /* Tighter spacing for bullet/numbered lists */
   .a-text ul:not(.connected-bullets):not(.no-decoration):not(.a-list) {
     margin-top: 4px !important;
+    margin-bottom: 1rem !important;
     margin-left: 0 !important;
     padding-left: 2em !important;
     list-style: disc !important;
