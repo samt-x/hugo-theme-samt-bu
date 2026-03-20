@@ -1572,7 +1572,13 @@ setTimeout(function() {
           saveBtn.style.background = '';
           saveBtn.style.cursor = '';
           saveBtn.textContent = qeLang === 'en' ? 'Retry' : 'Prøv igjen';
-          setStatus('⚠ ' + err.message);
+          var msg = err.message;
+          if (msg === 'Update is not a fast forward') {
+            msg = qeLang === 'en'
+              ? 'Conflict: page was changed by others. Try again.'
+              : 'Konflikt: siden ble endret av andre. Prøv igjen.';
+          }
+          setStatus('⚠ ' + msg);
         }
       });
   });
