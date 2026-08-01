@@ -16,16 +16,29 @@ function getStoredToken() {
   return null;
 }
 
+// Tøm rettighets-cachen for ALLE repoer. Skanner nøkler i stedet for å bruke en
+// hardkodet repo-liste – tidligere ble kun prefikset 'samtu-perm-' ryddet, mens
+// nøklene faktisk skrives som 'samtu-perm2-' (se checkCollaboratorPermission).
+function samtuClearPermCache() {
+  try {
+    var doomed = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf('samtu-perm') === 0) doomed.push(k);
+    }
+    doomed.forEach(function(k) { try { localStorage.removeItem(k); } catch(e2) {} });
+  } catch(e) {}
+}
+
 function storeToken(token) {
   try {
     localStorage.setItem(SAMT_TOKEN_KEY, token);
     localStorage.removeItem('samt-bu-gh-user');
     localStorage.removeItem('samt-bu-gh-name');
     localStorage.removeItem('samt-bu-gh-avatar');
-    ['samt-bu-docs','team-architecture','samt-bu-drafts','solution-samt-bu-docs'].forEach(function(r) {
-      try { localStorage.removeItem('samtu-perm-' + r); } catch(e2) {}
-    });
   } catch(e) {}
+  samtuClearPermCache();
+  try { sessionStorage.removeItem('samtu-prs-v1'); } catch(e) {}
 }
 
 function doGitHubLogin(onSuccess, loginHint) {
@@ -261,6 +274,8 @@ function updateAvatarDisplay() {
     if (loginBtn) { loginBtn.style.display = 'inline-block'; }
     samtuResetMenuLabels();
   }
+  // Admin-gruppen i Endre-menyen følger innloggingstilstanden
+  if (typeof samtuUpdateAdminMenu === 'function') samtuUpdateAdminMenu();
 }
 function samtuUpdateMenuLabels() {
   if (!window._samtuThisPage) return;
@@ -287,10 +302,9 @@ function samtuLogout() {
     localStorage.removeItem('samt-bu-gh-name');
     localStorage.removeItem('samt-bu-gh-avatar');
     localStorage.setItem('samtu-force-login', '1');
-    ['samt-bu-docs','team-architecture','samt-bu-drafts','solution-samt-bu-docs'].forEach(function(r) {
-      localStorage.removeItem('samtu-perm-' + r);
-    });
   } catch(e) {}
+  samtuClearPermCache();
+  try { sessionStorage.removeItem('samtu-prs-v1'); } catch(e) {}
   updateAvatarDisplay();
 }
 
@@ -313,6 +327,116 @@ function checkCollaboratorPermission(repo, callback) {
       callback(canWrite);
     })
     .catch(function() { callback(false); });
+}
+
+/* ---------------------------------------------------------------------------
+   Plattformsøm mot GitHub (issue #60)
+
+   Alle NYE kall mot forslagshåndtering går gjennom disse funksjonene. Målet er
+   at en annen Git-vert senere kan legges inn som en alternativ implementasjon
+   av samme fire operasjoner, uten å røre kallstedene. Eldre kall i denne filen
+   snakker fortsatt direkte med api.github.com – de flyttes hit etter hvert.
+
+   Operasjoner: samtuPrList · samtuPrMerge · samtuPrClose · samtuPrComment
+--------------------------------------------------------------------------- */
+var SAMTU_ORG = 'SAMT-X';
+var SAMTU_REPOS = [
+  'samt-bu-docs',
+  'solution-samt-bu-docs',
+  'team-architecture',
+  'team-semantics',
+  'samt-bu-drafts',
+  'samt-bu-pilot-1',
+  'samt-bu-pilot-2',
+  'samt-bu-pilot-3',
+  'samt-bu-pilot-4',
+  'samt-bu-market-engagement'
+];
+
+// Lavnivå: ett kall mot GitHub-API-et. Kaster Error med GitHubs egen melding.
+function samtuGh(path, opts) {
+  opts = opts || {};
+  var headers = { 'Accept': 'application/vnd.github+json' };
+  var token = getStoredToken();
+  if (token) headers['Authorization'] = 'token ' + token;
+  if (opts.body) headers['Content-Type'] = 'application/json';
+  return fetch('https://api.github.com' + path, {
+    method: opts.method || 'GET',
+    headers: headers,
+    cache: 'no-store',
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  }).then(function(r) {
+    return r.json().catch(function() { return {}; }).then(function(json) {
+      if (!r.ok) {
+        var err = new Error(json.message || r.statusText || ('HTTP ' + r.status));
+        err.status = r.status;
+        throw err;
+      }
+      return json;
+    });
+  });
+}
+
+// Åpne forslag på tvers av alle repoer. Ett repo som feiler stopper ikke resten.
+// Returnerer en flat liste sortert med nyeste først.
+function samtuPrList() {
+  var jobs = SAMTU_REPOS.map(function(repo) {
+    return samtuGh('/repos/' + SAMTU_ORG + '/' + repo + '/pulls?state=open&per_page=30')
+      .then(function(prs) {
+        return (prs || []).map(function(pr) {
+          return {
+            repo: repo,
+            number: pr.number,
+            title: pr.title,
+            author: (pr.user && pr.user.login) || '',
+            authorUrl: (pr.user && pr.user.html_url) || '',
+            createdAt: pr.created_at,
+            updatedAt: pr.updated_at,
+            url: pr.html_url,
+            draft: !!pr.draft,
+            branch: pr.head && pr.head.ref
+          };
+        });
+      })
+      .catch(function() { return []; });   // f.eks. 404 for repo brukeren ikke ser
+  });
+  return Promise.all(jobs).then(function(lists) {
+    var all = [];
+    lists.forEach(function(l) { all = all.concat(l); });
+    all.sort(function(a, b) { return new Date(b.updatedAt) - new Date(a.updatedAt); });
+    return all;
+  });
+}
+
+// Slå sammen. merge_method 'merge' er bevisst: gir «Merged» (lilla) i GitHub,
+// ikke «Closed» – som er forvirrende for ikke-tekniske bidragsytere.
+function samtuPrMerge(repo, number, commitTitle) {
+  return samtuGh('/repos/' + SAMTU_ORG + '/' + repo + '/pulls/' + number + '/merge', {
+    method: 'PUT',
+    body: { merge_method: 'merge', commit_title: commitTitle || undefined }
+  });
+}
+
+function samtuPrClose(repo, number) {
+  return samtuGh('/repos/' + SAMTU_ORG + '/' + repo + '/pulls/' + number, {
+    method: 'PATCH',
+    body: { state: 'closed' }
+  });
+}
+
+// PR-er er issues i GitHubs datamodell – kommentarer går mot issues-endepunktet.
+function samtuPrComment(repo, number, body) {
+  return samtuGh('/repos/' + SAMTU_ORG + '/' + repo + '/issues/' + number + '/comments', {
+    method: 'POST',
+    body: { body: body }
+  });
+}
+
+// Promise-innpakning av den callback-baserte rettighetssjekken.
+function samtuCanWrite(repo) {
+  return new Promise(function(resolve) {
+    checkCollaboratorPermission(repo, resolve);
+  });
 }
 
 function makePrBranch() {
@@ -3029,6 +3153,45 @@ setTimeout(function() {
 })();
 </script>
 
+<!-- Flytende vindu: Behandle forslag (PR-oversikt på tvers av repoene).
+     NB: denne filen har ingen Hugo-templating – all tekst settes i JS fra lang. -->
+<style>
+  #pr-list { flex:1; overflow-y:auto; min-height:0; }
+  .pr-row { padding:.75rem 1.4rem; border-bottom:1px solid #e8edf3; }
+  .pr-row:hover { background:#f8fafc; }
+  .pr-repo { display:inline-block; font-size:11px; font-weight:600; letter-spacing:.03em;
+             background:#e6edf6; color:#3a5a80; border-radius:10px; padding:1px 9px; margin-right:8px; }
+  .pr-title { font-size:15px; color:#1a4a8a; text-decoration:none; font-weight:600; line-height:1.4; }
+  .pr-title:hover { text-decoration:underline; }
+  .pr-meta { font-size:13px; color:#667; margin-top:3px; }
+  .pr-actions { display:flex; gap:.5rem; align-items:center; margin-top:.55rem; }
+  .pr-btn { padding:.32rem .9rem; border-radius:4px; font-size:13px; font-family:inherit;
+            cursor:pointer; border:1px solid #ccc; background:#fff; color:#333; }
+  .pr-btn:hover { background:#f0f4ff; }
+  .pr-btn[disabled] { opacity:.5; cursor:default; }
+  .pr-btn-merge { background:#1a6b3a; border-color:#1a6b3a; color:#fff; font-weight:600; }
+  .pr-btn-merge:hover { background:#15582f; }
+  .pr-btn-close { color:#b00020; border-color:#e0bcbc; }
+  .pr-btn-close:hover { background:#fff5f5; }
+  .pr-note { font-size:13px; margin-top:.5rem; padding:.5rem .8rem; border-radius:4px; line-height:1.5; }
+  .pr-note-err { background:#fff0f0; border:1px solid #f5c6c6; color:#900; }
+  .pr-note-ok  { background:#eef8f2; border:1px solid #b8ddc6; color:#1a5c3a; }
+  .pr-empty { padding:2rem 1.4rem; color:#778; font-style:italic; font-size:15px; }
+</style>
+<div id="pr-overlay" style="display:none; position:fixed; left:290px; top:145px; width:720px; height:calc(100vh - 220px); z-index:99998; flex-direction:column; background:#fff; box-shadow:0 4px 28px rgba(0,0,0,.32); border-radius:6px; overflow:hidden; min-width:420px; min-height:280px;">
+  <div id="pr-header" style="display:flex; align-items:center; padding:.6rem 1.25rem; background:#1a4a8a; color:#fff; flex-shrink:0; cursor:move; user-select:none;">
+    <div style="flex:1;"></div>
+    <span id="pr-heading" style="font-size:1.35rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:55%;"></span>
+    <div style="flex:1; display:flex; justify-content:flex-end; align-items:center; gap:.6rem;">
+      <span id="pr-status-text" style="font-size:1rem; opacity:.85; white-space:nowrap;"></span>
+      <button type="button" id="pr-refresh-btn" style="padding:.35rem .6rem; border:1px solid rgba(255,255,255,.4); border-radius:4px; background:transparent; color:#fff; cursor:pointer; font-size:14px; line-height:1;"><i class="fa fa-refresh"></i></button>
+      <button type="button" id="pr-maximize-btn" style="padding:.35rem .6rem; border:1px solid rgba(255,255,255,.4); border-radius:4px; background:transparent; color:#fff; cursor:pointer; font-size:14px; line-height:1;"><i class="fa fa-expand"></i></button>
+      <button type="button" id="pr-close-btn" style="padding:.35rem .9rem; border:1px solid rgba(255,255,255,.5); border-radius:4px; background:transparent; color:#fff; cursor:pointer; font-size:15px; font-family:inherit;"></button>
+    </div>
+  </div>
+  <div id="pr-list"></div>
+</div>
+
 <!-- Flytende dialogvinduer: drag, resize-persistens, maksimering -->
 <script>
 (function() {
@@ -3036,7 +3199,8 @@ setTimeout(function() {
     { overlayId: 'qe-overlay', headerId: 'qe-header', maxBtnId: 'qe-maximize-btn' },
     { overlayId: 'np-overlay', headerId: 'np-header', maxBtnId: 'np-maximize-btn' },
     { overlayId: 'cm-overlay', headerId: 'cm-header', maxBtnId: 'cm-maximize-btn' },
-    { overlayId: 'del-overlay', headerId: 'del-header', maxBtnId: null }
+    { overlayId: 'del-overlay', headerId: 'del-header', maxBtnId: null },
+    { overlayId: 'pr-overlay', headerId: 'pr-header', maxBtnId: 'pr-maximize-btn' }
   ];
 
   function saveState(overlay) {
@@ -3731,4 +3895,318 @@ function enterMoveMode(repo, dirPath, lang, permalink) {
 
 var _mvResume = _mvGet();
 if (_mvResume) _mvApply(_mvResume);
+</script>
+
+<!-- Behandle forslag: PR-oversikt på tvers av repoene (issue #60).
+     Alle funksjoner er GLOBALE deklarasjoner – kalles fra onclick i edit-switcher
+     og fra andre script-blokker. Se minifiseringsreglene i critical-notes. -->
+<script>
+var _prLang = 'nb';
+var _prCache = null;          // { ts, prs }
+var _prPerm = {};             // repo -> true/false
+var PR_CACHE_TTL = 60000;     // 1 min
+
+function _prIsEn() { return _prLang === 'en'; }
+
+function _prEsc(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function _prAgo(dateStr) {
+  var isEn = _prIsEn();
+  var secs = Math.round((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (secs < 60)    return isEn ? 'just now' : 'akkurat nå';
+  if (secs < 3600)  return Math.floor(secs / 60) + (isEn ? ' min ago' : ' min siden');
+  if (secs < 86400) return Math.floor(secs / 3600) + (isEn ? ' h ago' : ' t siden');
+  var d = Math.floor(secs / 86400);
+  if (d === 1) return isEn ? 'yesterday' : 'i går';
+  return d + (isEn ? ' days ago' : ' dager siden');
+}
+
+function _prSetStatus(msg) {
+  var el = document.getElementById('pr-status-text');
+  if (el) el.textContent = msg || '';
+}
+
+// Standardmelding etter merge. Bevisst uten tidsestimat («snart», ikke «om ett
+// minutt») – se feedback om PR-akseptmeldinger.
+function _prMergeComment() {
+  return _prIsEn()
+    ? 'Thank you – your suggestion has been approved and included. The website will be updated shortly.'
+    : 'Takk for forslaget! Det er godkjent og tatt inn. Nettstedet oppdateres snart.';
+}
+
+function _prCloseComment() {
+  return _prIsEn()
+    ? 'Thank you for the suggestion. We are not taking this one forward, but the input is appreciated and noted.'
+    : 'Takk for forslaget. Vi tar det ikke videre denne gangen, men innspillet er notert og satt pris på.';
+}
+
+function openPrDialog(lang) {
+  _prLang = lang || 'nb';
+  var isEn = _prIsEn();
+  var overlay = document.getElementById('pr-overlay');
+  if (!overlay) return;
+
+  if (!getStoredToken()) {
+    doGitHubLogin(function() { openPrDialog(lang); });
+    return;
+  }
+
+  document.getElementById('pr-heading').textContent = isEn ? 'Handle suggestions' : 'Behandle forslag';
+  document.getElementById('pr-close-btn').textContent = isEn ? 'Close' : 'Lukk';
+  document.getElementById('pr-refresh-btn').title = isEn ? 'Refresh' : 'Oppdater';
+  overlay.style.display = 'flex';
+  _prLoad(false);
+}
+
+function closePrDialog() {
+  var overlay = document.getElementById('pr-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+function _prLoad(force) {
+  var isEn = _prIsEn();
+  var listEl = document.getElementById('pr-list');
+  if (!listEl) return;
+
+  if (!force && _prCache && (Date.now() - _prCache.ts) < PR_CACHE_TTL) {
+    _prRender(_prCache.prs);
+    return;
+  }
+
+  listEl.innerHTML = '<div class="pr-empty">' + (isEn ? 'Loading…' : 'Laster…') + '</div>';
+  _prSetStatus('');
+
+  samtuPrList().then(function(prs) {
+    _prCache = { ts: Date.now(), prs: prs };
+    // Hent skrivetilgang for de repoene som faktisk har forslag – cachet 1 t.
+    var repos = [];
+    prs.forEach(function(p) { if (repos.indexOf(p.repo) === -1) repos.push(p.repo); });
+    return Promise.all(repos.map(function(r) {
+      return samtuCanWrite(r).then(function(ok) { _prPerm[r] = ok; });
+    })).then(function() { return prs; });
+  }).then(function(prs) {
+    _prRender(prs);
+  }).catch(function(err) {
+    listEl.innerHTML = '<div class="pr-empty" style="color:#900; font-style:normal;">'
+      + (isEn ? 'Could not load suggestions: ' : 'Kunne ikke hente forslag: ')
+      + _prEsc(err.message) + '</div>';
+  });
+}
+
+function _prRender(prs) {
+  var isEn = _prIsEn();
+  var listEl = document.getElementById('pr-list');
+  if (!listEl) return;
+
+  _prSetStatus(prs.length === 0 ? '' :
+    (prs.length === 1 ? (isEn ? '1 open' : '1 åpent') : prs.length + (isEn ? ' open' : ' åpne')));
+
+  if (prs.length === 0) {
+    listEl.innerHTML = '<div class="pr-empty">'
+      + (isEn ? 'No open suggestions. Nothing to handle right now.'
+              : 'Ingen åpne forslag. Ingenting å behandle akkurat nå.') + '</div>';
+    return;
+  }
+
+  var html = '';
+  prs.forEach(function(pr) {
+    var canWrite = !!_prPerm[pr.repo];
+    var rowId = 'pr-row-' + pr.repo + '-' + pr.number;
+    html += '<div class="pr-row" id="' + _prEsc(rowId) + '">'
+      + '<div>'
+      +   '<span class="pr-repo">' + _prEsc(pr.repo) + '</span>'
+      +   '<a class="pr-title" href="' + _prEsc(pr.url) + '" target="_blank" rel="noopener">'
+      +     _prEsc(pr.title) + '</a>'
+      +   (pr.draft ? ' <span style="font-size:12px; color:#888;">('
+      +     (isEn ? 'draft' : 'utkast') + ')</span>' : '')
+      + '</div>'
+      + '<div class="pr-meta">#' + pr.number + ' · '
+      +   (isEn ? 'by ' : 'fra ') + _prEsc(pr.author)
+      +   ' · ' + _prEsc(_prAgo(pr.updatedAt)) + '</div>'
+      + '<div class="pr-actions">'
+      +   '<a class="pr-btn" href="' + _prEsc(pr.url) + '/files" target="_blank" rel="noopener"'
+      +     ' style="text-decoration:none;">' + (isEn ? 'See changes' : 'Se endringene') + '</a>';
+    if (canWrite) {
+      html += '<button type="button" class="pr-btn pr-btn-merge"'
+        +   ' data-pr-act="merge" data-pr-repo="' + _prEsc(pr.repo) + '" data-pr-num="' + pr.number + '">'
+        +   (isEn ? 'Merge' : 'Slå sammen') + '</button>'
+        + '<button type="button" class="pr-btn pr-btn-close"'
+        +   ' data-pr-act="close" data-pr-repo="' + _prEsc(pr.repo) + '" data-pr-num="' + pr.number + '">'
+        +   (isEn ? 'Decline' : 'Avslå') + '</button>';
+    } else {
+      html += '<span style="font-size:13px; color:#889;">'
+        + (isEn ? 'You do not have write access to this repository'
+                : 'Du har ikke skrivetilgang til dette repoet') + '</span>';
+    }
+    html += '</div><div class="pr-note" style="display:none;"></div></div>';
+  });
+  listEl.innerHTML = html;
+}
+
+// To-stegs bekreftelse: første klikk ber om bekreftelse i raden, andre utfører.
+function _prConfirm(btn, repo, number, act) {
+  var isEn = _prIsEn();
+  var row = document.getElementById('pr-row-' + repo + '-' + number);
+  if (!row) return;
+  var note = row.querySelector('.pr-note');
+
+  if (btn.dataset.prArmed === '1') {
+    _prExecute(row, btn, repo, number, act);
+    return;
+  }
+
+  // Avvæpne alle andre knapper først
+  _prDisarmAll();
+  btn.dataset.prArmed = '1';
+  btn.dataset.prLabel = btn.textContent;
+  btn.textContent = isEn ? 'Confirm' : 'Bekreft';
+  note.className = 'pr-note pr-note-ok';
+  note.style.display = 'block';
+  note.textContent = act === 'merge'
+    ? (isEn ? 'This includes the changes in the website and posts a thank-you comment to the contributor. Click "Confirm" to proceed.'
+            : 'Dette tar endringene inn i nettstedet og legger igjen en takkekommentar til bidragsyteren. Klikk «Bekreft» for å fullføre.')
+    : (isEn ? 'This declines the suggestion and posts a friendly comment. Nothing is deleted – it can be reopened in GitHub. Click "Confirm" to proceed.'
+            : 'Dette avslår forslaget og legger igjen en vennlig kommentar. Ingenting slettes – det kan gjenåpnes i GitHub. Klikk «Bekreft» for å fullføre.');
+}
+
+function _prDisarmAll() {
+  var btns = document.querySelectorAll('#pr-list [data-pr-act]');
+  for (var i = 0; i < btns.length; i++) {
+    if (btns[i].dataset.prArmed === '1') {
+      btns[i].dataset.prArmed = '0';
+      if (btns[i].dataset.prLabel) btns[i].textContent = btns[i].dataset.prLabel;
+      var r = btns[i].closest('.pr-row');
+      var n = r && r.querySelector('.pr-note');
+      if (n) { n.style.display = 'none'; n.textContent = ''; }
+    }
+  }
+}
+
+function _prExecute(row, btn, repo, number, act) {
+  var isEn = _prIsEn();
+  var note = row.querySelector('.pr-note');
+  var allBtns = row.querySelectorAll('[data-pr-act]');
+  for (var i = 0; i < allBtns.length; i++) allBtns[i].disabled = true;
+
+  note.className = 'pr-note pr-note-ok';
+  note.style.display = 'block';
+  note.textContent = act === 'merge'
+    ? (isEn ? 'Merging…' : 'Slår sammen…')
+    : (isEn ? 'Declining…' : 'Avslår…');
+
+  var op = act === 'merge'
+    ? samtuPrMerge(repo, number)
+    : samtuPrClose(repo, number);
+
+  op.then(function() {
+    // Kommentaren er en høflighet, ikke en forutsetning – en feil her skal ikke
+    // få handlingen til å se mislykket ut.
+    return samtuPrComment(repo, number,
+      act === 'merge' ? _prMergeComment() : _prCloseComment()
+    ).catch(function() { return null; });
+  }).then(function() {
+    note.className = 'pr-note pr-note-ok';
+    note.textContent = act === 'merge'
+      ? (isEn ? 'Merged. The website will rebuild shortly.'
+              : 'Slått sammen. Nettstedet bygges på nytt snart.')
+      : (isEn ? 'Declined and commented.' : 'Avslått, med kommentar.');
+    row.style.opacity = '.6';
+    _prCache = null;   // tving ny henting neste gang
+  }).catch(function(err) {
+    note.className = 'pr-note pr-note-err';
+    var msg = err.message || '';
+    if (err.status === 405 || /not mergeable|conflict/i.test(msg)) {
+      msg = isEn
+        ? 'This suggestion conflicts with the current content and cannot be merged automatically. It has to be resolved in GitHub.'
+        : 'Dette forslaget er i konflikt med gjeldende innhold og kan ikke slås sammen automatisk. Det må løses i GitHub.';
+    } else if (err.status === 403) {
+      msg = isEn
+        ? 'GitHub declined the action – you may not have sufficient rights to this repository.'
+        : 'GitHub avviste handlingen – du har kanskje ikke tilstrekkelige rettigheter til dette repoet.';
+    }
+    note.textContent = (isEn ? '⚠ ' : '⚠ ') + msg;
+    for (var j = 0; j < allBtns.length; j++) allBtns[j].disabled = false;
+    btn.dataset.prArmed = '0';
+    if (btn.dataset.prLabel) btn.textContent = btn.dataset.prLabel;
+  });
+}
+
+// Viser admin-gruppen i Endre-menyen dersom brukeren har skrivetilgang.
+// Gates på repoet for GJELDENDE side – rettighetssjekk på tvers av ti repoer
+// ved hver sidelast ville vært for dyrt. Skjuling er kosmetikk, ikke sikkerhet.
+function samtuUpdateAdminMenu() {
+  if (!window._samtuThisPage) return;
+  if (!getStoredToken()) {
+    var g0 = document.getElementById('samtu-admin-group');
+    var i0 = document.getElementById('samtu-admin-prs');
+    if (g0) g0.style.display = 'none';
+    if (i0) i0.style.display = 'none';
+    return;
+  }
+  checkCollaboratorPermission(window._samtuThisPage.repo, function(canWrite) {
+    var group = document.getElementById('samtu-admin-group');
+    var item  = document.getElementById('samtu-admin-prs');
+    if (!group || !item) return;
+    group.style.display = canWrite ? 'block' : 'none';
+    item.style.display  = canWrite ? 'block' : 'none';
+    if (canWrite) _prUpdateMenuCount();
+  });
+}
+
+// Antall åpne forslag i menyetiketten. Bruker sessionStorage slik at tallet
+// ikke koster ti API-kall ved hver sidevisning.
+function _prUpdateMenuCount() {
+  var label = document.getElementById('samtu-admin-prs-label');
+  if (!label) return;
+  var lang = (window._samtuThisPage && window._samtuThisPage.lang) || 'nb';
+  var base = lang === 'en' ? 'Handle suggestions' : 'Behandle forslag';
+
+  function paint(n) { label.textContent = n > 0 ? base + ' (' + n + ')' : base; }
+
+  try {
+    var c = JSON.parse(sessionStorage.getItem('samtu-prs-v1'));
+    if (c && (Date.now() - c.ts) < 300000) { paint(c.n); return; }
+  } catch(e) {}
+
+  samtuPrList().then(function(prs) {
+    try { sessionStorage.setItem('samtu-prs-v1', JSON.stringify({ ts: Date.now(), n: prs.length })); } catch(e) {}
+    paint(prs.length);
+  }).catch(function() {});
+}
+
+(function() {
+  var overlay = document.getElementById('pr-overlay');
+  if (!overlay) return;
+
+  var closeBtn = document.getElementById('pr-close-btn');
+  if (closeBtn) closeBtn.addEventListener('click', closePrDialog);
+
+  var refreshBtn = document.getElementById('pr-refresh-btn');
+  if (refreshBtn) refreshBtn.addEventListener('click', function() {
+    try { sessionStorage.removeItem('samtu-prs-v1'); } catch(e) {}
+    _prCache = null;
+    _prLoad(true);
+  });
+
+  // Delegert klikk – radene bygges på nytt ved hver rendring.
+  var listEl = document.getElementById('pr-list');
+  if (listEl) listEl.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-pr-act]');
+    if (!btn || btn.disabled) return;
+    _prConfirm(btn, btn.dataset.prRepo, btn.dataset.prNum, btn.dataset.prAct);
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape') return;
+    if (overlay.style.display === 'none' || !overlay.style.display) return;
+    if (document.querySelector('#pr-list [data-pr-armed="1"]')) { _prDisarmAll(); return; }
+    closePrDialog();
+  });
+
+  samtuUpdateAdminMenu();
+})();
 </script>
