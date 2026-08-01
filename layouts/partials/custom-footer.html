@@ -301,8 +301,8 @@ function samtbuLogoutNotice() {
   var p2 = document.createElement('p');
   p2.style.cssText = 'margin:0 0 .7rem; font-size:13px; color:#667;';
   p2.textContent = en
-    ? 'Signing in again reconnects to the same GitHub account. To use a different account, use the arrow next to the “Log in” button – or sign out of GitHub too.'
-    : 'Neste innlogging kobler automatisk til samme GitHub-konto. Vil du bruke en annen konto, bruk pilen ved «Logg inn»-knappen – eller logg ut av GitHub også.';
+    ? 'Signing in again reconnects to the same GitHub account. To use a different one, sign out of GitHub too.'
+    : 'Neste innlogging kobler automatisk til samme GitHub-konto. Vil du bruke en annen, logg ut av GitHub også.';
 
   var row = document.createElement('div');
   row.style.cssText = 'display:flex; gap:.6rem; justify-content:flex-end; align-items:center;';
@@ -366,17 +366,14 @@ function updateAvatarDisplay() {
   var label    = document.getElementById('samt-bu-avatar-username');
   var avatar   = localStorage.getItem('samt-bu-gh-avatar');
   var login    = localStorage.getItem('samt-bu-gh-user');
-  var caret = document.getElementById('samt-bu-login-caret');
   if (avatar && login) {
     if (img)      { img.src = avatar; img.title = '@' + login; img.style.display = 'inline-block'; }
     if (label)    { label.textContent = '@' + login; }
     if (loginBtn) { loginBtn.style.display = 'none'; }
-    if (caret)    { caret.style.display = 'none'; }
     samtbuUpdateMenuLabels();
   } else {
     if (img)      { img.style.display = 'none'; }
     if (loginBtn) { loginBtn.style.display = 'inline-block'; }
-    if (caret)    { caret.style.display = 'inline-block'; }
     samtbuResetMenuLabels();
   }
   // Admin-gruppen i Endre-menyen følger innloggingstilstanden
@@ -1214,16 +1211,9 @@ setTimeout(function() {
     });
   }
 
-  /* Pil ved «Logg inn»: kontovelger fra UTLOGGET tilstand. «Bytt bruker» ligger
-     i avatar-menyen og finnes bare innlogget – uten pilen har en utlogget
-     bruker ingen måte å velge konto på (funnet 2026-08-01). */
-  var loginCaret = document.getElementById('samt-bu-login-caret');
-  if (loginCaret) {
-    loginCaret.addEventListener('click', function(e) {
-      e.preventDefault();
-      doGitHubLogin(function() { fetchCurrentUser(function() {}); }, '*');
-    });
-  }
+  /* Ingen egen kontovelger-knapp for utlogget tilstand: GitHub viser velgeren
+     automatisk når brukeren har flere kontoer innlogget. Prøvd som pil ved
+     «Logg inn» 2026-08-01 – ga nøyaktig samme skjerm og ble fjernet igjen. */
 
   if (!img || !menu) return;
 
