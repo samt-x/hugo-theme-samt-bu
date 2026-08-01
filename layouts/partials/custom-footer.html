@@ -296,8 +296,8 @@ function samtbuLogoutNotice() {
   var p2 = document.createElement('p');
   p2.style.cssText = 'margin:0 0 .7rem; font-size:13px; color:#667;';
   p2.textContent = en
-    ? 'Signing in again reconnects to the same GitHub account. To use a different account, choose “Switch user” in the menu – or sign out of GitHub too.'
-    : 'Neste innlogging kobler automatisk til samme GitHub-konto. Vil du bruke en annen konto, velg «Bytt bruker» i menyen – eller logg ut av GitHub også.';
+    ? 'Signing in again reconnects to the same GitHub account. To use a different account, use the arrow next to the “Log in” button – or sign out of GitHub too.'
+    : 'Neste innlogging kobler automatisk til samme GitHub-konto. Vil du bruke en annen konto, bruk pilen ved «Logg inn»-knappen – eller logg ut av GitHub også.';
 
   var row = document.createElement('div');
   row.style.cssText = 'display:flex; gap:.6rem; justify-content:flex-end; align-items:center;';
@@ -361,14 +361,19 @@ function updateAvatarDisplay() {
   var label    = document.getElementById('samt-bu-avatar-username');
   var avatar   = localStorage.getItem('samt-bu-gh-avatar');
   var login    = localStorage.getItem('samt-bu-gh-user');
+  var caret = document.getElementById('samt-bu-login-caret');
+  var lmenu = document.getElementById('samt-bu-login-menu');
   if (avatar && login) {
     if (img)      { img.src = avatar; img.title = '@' + login; img.style.display = 'inline-block'; }
     if (label)    { label.textContent = '@' + login; }
     if (loginBtn) { loginBtn.style.display = 'none'; }
+    if (caret)    { caret.style.display = 'none'; }
+    if (lmenu)    { lmenu.style.display = 'none'; }
     samtbuUpdateMenuLabels();
   } else {
     if (img)      { img.style.display = 'none'; }
     if (loginBtn) { loginBtn.style.display = 'inline-block'; }
+    if (caret)    { caret.style.display = 'inline-block'; }
     samtbuResetMenuLabels();
   }
   // Admin-gruppen i Endre-menyen følger innloggingstilstanden
@@ -1201,6 +1206,61 @@ setTimeout(function() {
       });
     });
   }
+
+  /* Pil ved «Logg inn»: logg inn som navngitt bruker fra UTLOGGET tilstand.
+     «Bytt bruker» i avatar-menyen finnes bare når man er innlogget – uten
+     denne har en utlogget bruker ingen måte å velge konto på (funnet 2026-08-01). */
+  var loginCaret = document.getElementById('samt-bu-login-caret');
+  var loginMenu  = document.getElementById('samt-bu-login-menu');
+  var loginInput = document.getElementById('samt-bu-login-input');
+  var loginGo    = document.getElementById('samt-bu-login-go');
+  var loginMsg   = document.getElementById('samt-bu-login-msg');
+
+  function closeLoginMenu() {
+    if (loginMenu) loginMenu.style.display = 'none';
+    if (loginMsg)  loginMsg.style.display  = 'none';
+  }
+
+  function doLoginAs() {
+    var username = loginInput ? loginInput.value.trim().replace(/^@/, '') : '';
+    if (!username) { if (loginInput) loginInput.focus(); return; }
+    if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(username)) {
+      if (loginMsg) {
+        loginMsg.textContent = (window._samtbuThisPage && window._samtbuThisPage.lang === 'en')
+          ? 'Not a valid GitHub username.' : 'Ikke et gyldig GitHub-brukernavn.';
+        loginMsg.style.display = 'block';
+      }
+      return;
+    }
+    closeLoginMenu();
+    doGitHubLogin(function() { fetchCurrentUser(function() {}); }, username);
+  }
+
+  if (loginCaret) {
+    loginCaret.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var open = loginMenu && loginMenu.style.display !== 'none' && loginMenu.style.display !== '';
+      if (open) { closeLoginMenu(); return; }
+      if (loginMenu)  loginMenu.style.display = 'block';
+      if (loginInput) { loginInput.value = ''; loginInput.focus(); }
+    });
+  }
+  if (loginMenu) {
+    loginMenu.addEventListener('click', function(e) { e.stopPropagation(); });
+  }
+  if (loginGo) {
+    loginGo.addEventListener('click', function(e) {
+      e.preventDefault(); e.stopPropagation(); doLoginAs();
+    });
+  }
+  if (loginInput) {
+    loginInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter')  { e.preventDefault(); doLoginAs(); }
+      if (e.key === 'Escape') { e.preventDefault(); closeLoginMenu(); }
+    });
+  }
+  document.addEventListener('click', closeLoginMenu);
 
   if (!img || !menu) return;
 

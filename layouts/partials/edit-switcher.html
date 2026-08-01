@@ -174,7 +174,19 @@
 
 <script>window._samtbuThisPage={{ dict "repo" $githubRepo "dirPath" $dirPath "lang" $lang "perm" .RelPermalink "weight" .Weight "title" .Title "slug" $entrySlug | jsonify | safeJS }};</script>
 <div id="samt-bu-avatar-wrap" style="position:relative; margin-right:6px; line-height:0; display:inline-block;">
-  <a href="#" id="samt-bu-login-btn" style="display:none; color:rgba(255,255,255,.8); font-size:13px; text-decoration:none; vertical-align:middle; white-space:nowrap; border:1px solid rgba(255,255,255,.4); border-radius:4px; padding:3px 9px; line-height:1.6;">{{ cond (eq $lang "en") "Log in" "Logg inn" }}</a>
+  <a href="#" id="samt-bu-login-btn" style="display:none; color:rgba(255,255,255,.8); font-size:13px; text-decoration:none; vertical-align:middle; white-space:nowrap; border:1px solid rgba(255,255,255,.4); border-radius:4px; padding:3px 9px; line-height:1.6;">{{ cond (eq $lang "en") "Log in" "Logg inn" }}</a
+  >{{- /* Pil ved Logg inn: innlogging som navngitt bruker FRA UTLOGGET tilstand.
+        «Bytt bruker» ligger i avatar-menyen og finnes bare når man er innlogget –
+        uten denne pilen har en utlogget bruker ingen måte å velge konto på. */ -}}
+  <a href="#" id="samt-bu-login-caret" title="{{ cond (eq $lang "en") "Log in as a different user" "Logg inn som en annen bruker" }}" style="display:none; color:rgba(255,255,255,.8); font-size:12px; text-decoration:none; vertical-align:middle; border:1px solid rgba(255,255,255,.4); border-radius:4px; padding:3px 7px; line-height:1.6; margin-left:3px;"><i class="fa fa-caret-down"></i></a>
+  <div id="samt-bu-login-menu" style="display:none; position:absolute; right:0; top:34px; background:#fff; border:1px solid #ddd; border-radius:6px; box-shadow:0 4px 18px rgba(0,0,0,.18); min-width:235px; padding:9px 14px 11px; z-index:99999; line-height:1.4;">
+    <label for="samt-bu-login-input" style="display:block; font-size:11px; font-weight:600; color:#667; text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px;">{{ cond (eq $lang "en") "Log in as" "Logg inn som" }}</label>
+    <div style="display:flex; gap:5px; align-items:center;">
+      <input id="samt-bu-login-input" type="text" placeholder="{{ cond (eq $lang "en") "GitHub username" "GitHub-brukernavn" }}" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1; font-size:13px; padding:5px 7px; border:1px solid #ccc; border-radius:3px; outline:none; min-width:0; font-family:inherit;">
+      <button id="samt-bu-login-go" type="button" style="font-size:13px; padding:5px 11px; border:1px solid #1a4a8a; border-radius:3px; background:#1a4a8a; color:#fff; cursor:pointer; font-family:inherit;">→</button>
+    </div>
+    <div id="samt-bu-login-msg" style="display:none; margin-top:5px; font-size:12px; color:#b00020;"></div>
+  </div>
   <img id="samt-bu-user-avatar" src="" alt="" style="display:none; width:26px; height:26px; border-radius:50%; border:2px solid rgba(255,255,255,.55); cursor:pointer; vertical-align:middle;" title="">
   <style>
     #samt-bu-switch-btn { color: #333 !important; }
