@@ -400,14 +400,17 @@ function samtbuResetMenuLabels() {
   if (moveLabel) moveLabel.textContent = lang === 'en' ? 'Move this chapter' : 'Flytt dette kapitlet';
 }
 
-/* Ekte utlogging: trekk tilbake godkjenningen hos GitHub, ikke bare glem
-   tokenet lokalt. Uten dette lever tokenet videre og virker om det lekker –
-   og GitHub slipper brukeren stille inn igjen som samme konto ved neste
-   innlogging, noe som får utloggingen til å se ødelagt ut.
+/* IKKE I BRUK ved utlogging – behold som verktøy, men les hvorfor:
 
-   Kallet er bevisst «fire and forget»: brukergrensesnittet oppdateres med én
-   gang, og en nettverksfeil skal aldri hindre at noen får logget ut lokalt.
-   keepalive gjør at kallet fullføres selv om siden lukkes rett etterpå. */
+   Vi prøvde 2026-08-01 å revokere hos GitHub ved utlogging, først grant,
+   så token. Empirisk funn: for GitHub Apps deler token og godkjenning
+   livssyklus, så SELV token-revokering fikk Authorize-skjermen («act on
+   your behalf») til å dukke opp ved hver eneste innlogging. Det opplevdes
+   som skremmende og ødela flyten.
+
+   Lokal sletting er tilstrekkelig utlogging her: tokenets eneste kopi
+   ligger i brukerens egen localStorage. Slettes den, finnes tokenet ikke
+   lenger hos klienten. (Samme modell som Decap brukte.)                    */
 function samtbuRevokeGrant(token) {
   if (!token) return;
   try {
@@ -421,7 +424,9 @@ function samtbuRevokeGrant(token) {
 }
 
 function samtbuLogout() {
-  var token = getStoredToken();   // må leses FØR vi sletter den
+  // KUN lokal sletting – ingen revokering hos GitHub. Se kommentaren over
+  // samtbuRevokeGrant for hvorfor (GitHub Apps: revoke ⇒ Authorize-skjerm
+  // ved hver innlogging).
   try {
     localStorage.removeItem(SAMT_TOKEN_KEY);
     localStorage.removeItem('samt-bu-gh-user');
@@ -429,7 +434,6 @@ function samtbuLogout() {
     localStorage.removeItem('samt-bu-gh-avatar');
     localStorage.setItem('samt-bu-force-login', '1');
   } catch(e) {}
-  samtbuRevokeGrant(token);
   samtbuClearPermCache();
   try { sessionStorage.removeItem('samt-bu-prs-v1'); } catch(e) {}
   updateAvatarDisplay();
