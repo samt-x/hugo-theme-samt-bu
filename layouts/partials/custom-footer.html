@@ -290,8 +290,14 @@ function samtbuLogoutNotice() {
   var p = document.createElement('p');
   p.style.cssText = 'margin:0 0 .7rem;';
   p.textContent = en
-    ? 'Logged out of this site. You are still signed in to GitHub, so logging in again will use the same account.'
-    : 'Du er logget ut av nettstedet. Du er fortsatt innlogget på GitHub, så neste innlogging bruker samme konto.';
+    ? 'Logged out. Access has been revoked, so signing in again requires approval.'
+    : 'Du er logget ut. Tilgangen er trukket tilbake, så neste innlogging må godkjennes på nytt.';
+
+  var p2 = document.createElement('p');
+  p2.style.cssText = 'margin:0 0 .7rem; font-size:13px; color:#667;';
+  p2.textContent = en
+    ? 'Your GitHub session in this browser is untouched. Sign out of GitHub too if you want to use a different account.'
+    : 'GitHub-sesjonen i nettleseren er urørt. Logg ut av GitHub også hvis du vil bruke en annen konto.';
 
   var row = document.createElement('div');
   row.style.cssText = 'display:flex; gap:.6rem; justify-content:flex-end; align-items:center;';
@@ -314,6 +320,7 @@ function samtbuLogoutNotice() {
   row.appendChild(dismiss);
   row.appendChild(out);
   box.appendChild(p);
+  box.appendChild(p2);
   box.appendChild(row);
   document.body.appendChild(box);
 
@@ -383,7 +390,28 @@ function samtbuResetMenuLabels() {
   if (moveLabel) moveLabel.textContent = lang === 'en' ? 'Move this chapter' : 'Flytt dette kapitlet';
 }
 
+/* Ekte utlogging: trekk tilbake godkjenningen hos GitHub, ikke bare glem
+   tokenet lokalt. Uten dette lever tokenet videre og virker om det lekker –
+   og GitHub slipper brukeren stille inn igjen som samme konto ved neste
+   innlogging, noe som får utloggingen til å se ødelagt ut.
+
+   Kallet er bevisst «fire and forget»: brukergrensesnittet oppdateres med én
+   gang, og en nettverksfeil skal aldri hindre at noen får logget ut lokalt.
+   keepalive gjør at kallet fullføres selv om siden lukkes rett etterpå. */
+function samtbuRevokeGrant(token) {
+  if (!token) return;
+  try {
+    fetch('https://auth.samt-bu.no/revoke', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userToken: token }),
+      keepalive: true
+    }).catch(function() {});
+  } catch(e) {}
+}
+
 function samtbuLogout() {
+  var token = getStoredToken();   // må leses FØR vi sletter den
   try {
     localStorage.removeItem(SAMT_TOKEN_KEY);
     localStorage.removeItem('samt-bu-gh-user');
@@ -391,6 +419,7 @@ function samtbuLogout() {
     localStorage.removeItem('samt-bu-gh-avatar');
     localStorage.setItem('samt-bu-force-login', '1');
   } catch(e) {}
+  samtbuRevokeGrant(token);
   samtbuClearPermCache();
   try { sessionStorage.removeItem('samt-bu-prs-v1'); } catch(e) {}
   updateAvatarDisplay();
