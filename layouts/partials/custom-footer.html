@@ -1,5 +1,36 @@
 <!-- Delt GitHub-token-hjelper (global, brukes av alle redigeringsfunksjoner) -->
 <script>
+/* Migrering av lagringsnøkler: 'samtu-' -> 'samt-bu-'  (2026-08-01)
+
+   Prefikset 'samtu-' var en skrivefeil for 'samt-bu-'. Nøklene ligger i
+   brukernes egne nettlesere, så en ren omdøping ville gjort eksisterende
+   verdier foreldreløse. Det er ikke bare kosmetisk: 'samtu-build-pending'
+   holder byggejobber som er i gang, og 'samtu-move-state' en flytteoperasjon
+   midt i. Vi flytter dem derfor over i stedet for å forlate dem.
+
+   Må kjøre FØRST i denne filen – all annen kode leser nøklene lenger nede.
+   Kan fjernes når alle brukere har lastet siden minst én gang etter 2026-08.  */
+(function migrateSamtuKeys() {
+  ['localStorage', 'sessionStorage'].forEach(function(store) {
+    try {
+      var s = window[store];
+      var old = [];
+      for (var i = 0; i < s.length; i++) {
+        var k = s.key(i);
+        if (k && k.indexOf('samtu-') === 0) old.push(k);
+      }
+      old.forEach(function(k) {
+        var target = 'samt-bu-' + k.slice('samtu-'.length);
+        try {
+          // Ikke overskriv en nyere verdi som allerede finnes under nytt navn
+          if (s.getItem(target) === null) s.setItem(target, s.getItem(k));
+          s.removeItem(k);
+        } catch(e) {}
+      });
+    } catch(e) {}
+  });
+})();
+
 var SAMT_TOKEN_KEY = 'samt-bu-gh-token';
 
 function getStoredToken() {
@@ -17,14 +48,15 @@ function getStoredToken() {
 }
 
 // Tøm rettighets-cachen for ALLE repoer. Skanner nøkler i stedet for å bruke en
-// hardkodet repo-liste – tidligere ble kun prefikset 'samtu-perm-' ryddet, mens
-// nøklene faktisk skrives som 'samtu-perm2-' (se checkCollaboratorPermission).
-function samtuClearPermCache() {
+// hardkodet repo-liste: tidligere ryddet koden et annet prefiks enn det nøklene
+// faktisk ble skrevet med, så gjeldende cache ble aldri tømt ved utlogging.
+// Skanning gjør at feilen ikke kan gjenoppstå når nøkkelnavn endres.
+function samtbuClearPermCache() {
   try {
     var doomed = [];
     for (var i = 0; i < localStorage.length; i++) {
       var k = localStorage.key(i);
-      if (k && k.indexOf('samtu-perm') === 0) doomed.push(k);
+      if (k && k.indexOf('samt-bu-perm') === 0) doomed.push(k);
     }
     doomed.forEach(function(k) { try { localStorage.removeItem(k); } catch(e2) {} });
   } catch(e) {}
@@ -37,14 +69,14 @@ function storeToken(token) {
     localStorage.removeItem('samt-bu-gh-name');
     localStorage.removeItem('samt-bu-gh-avatar');
   } catch(e) {}
-  samtuClearPermCache();
-  try { sessionStorage.removeItem('samtu-prs-v1'); } catch(e) {}
+  samtbuClearPermCache();
+  try { sessionStorage.removeItem('samt-bu-prs-v1'); } catch(e) {}
 }
 
 function doGitHubLogin(onSuccess, loginHint) {
   var workerBase = 'https://auth.samt-bu.no';
-  var force = !loginHint && localStorage.getItem('samtu-force-login') === '1';
-  try { if (force || loginHint) localStorage.removeItem('samtu-force-login'); } catch(e) {}
+  var force = !loginHint && localStorage.getItem('samt-bu-force-login') === '1';
+  try { if (force || loginHint) localStorage.removeItem('samt-bu-force-login'); } catch(e) {}
   var authUrl = workerBase + '/auth?provider=github&site_id=samt-bu-docs' +
     (loginHint ? '&login=' + encodeURIComponent(loginHint) : (force ? '&force=true' : ''));
   var w = 600, h = 700;
@@ -259,57 +291,57 @@ function fetchCurrentUser(callback) {
 }
 
 function updateAvatarDisplay() {
-  var img      = document.getElementById('samtu-user-avatar');
-  var loginBtn = document.getElementById('samtu-login-btn');
-  var label    = document.getElementById('samtu-avatar-username');
+  var img      = document.getElementById('samt-bu-user-avatar');
+  var loginBtn = document.getElementById('samt-bu-login-btn');
+  var label    = document.getElementById('samt-bu-avatar-username');
   var avatar   = localStorage.getItem('samt-bu-gh-avatar');
   var login    = localStorage.getItem('samt-bu-gh-user');
   if (avatar && login) {
     if (img)      { img.src = avatar; img.title = '@' + login; img.style.display = 'inline-block'; }
     if (label)    { label.textContent = '@' + login; }
     if (loginBtn) { loginBtn.style.display = 'none'; }
-    samtuUpdateMenuLabels();
+    samtbuUpdateMenuLabels();
   } else {
     if (img)      { img.style.display = 'none'; }
     if (loginBtn) { loginBtn.style.display = 'inline-block'; }
-    samtuResetMenuLabels();
+    samtbuResetMenuLabels();
   }
   // Admin-gruppen i Endre-menyen følger innloggingstilstanden
-  if (typeof samtuUpdateAdminMenu === 'function') samtuUpdateAdminMenu();
+  if (typeof samtbuUpdateAdminMenu === 'function') samtbuUpdateAdminMenu();
 }
-function samtuUpdateMenuLabels() {
-  if (!window._samtuThisPage) return;
-  var lang = window._samtuThisPage.lang;
-  checkCollaboratorPermission(window._samtuThisPage.repo, function(canWrite) {
-    var editLabel = document.getElementById('samtu-edit-page-label');
-    var moveLabel = document.getElementById('samtu-move-label');
+function samtbuUpdateMenuLabels() {
+  if (!window._samtbuThisPage) return;
+  var lang = window._samtbuThisPage.lang;
+  checkCollaboratorPermission(window._samtbuThisPage.repo, function(canWrite) {
+    var editLabel = document.getElementById('samt-bu-edit-page-label');
+    var moveLabel = document.getElementById('samt-bu-move-label');
     if (editLabel) editLabel.textContent = canWrite ? (lang === 'en' ? 'Edit this page' : 'Rediger denne siden') : (lang === 'en' ? 'Suggest edit to this page' : 'Foreslå endring av denne siden');
     if (moveLabel) moveLabel.textContent = canWrite ? (lang === 'en' ? 'Move this chapter' : 'Flytt dette kapitlet') : (lang === 'en' ? 'Suggest moving this chapter' : 'Foreslå flytting av kapittel');
   });
 }
-function samtuResetMenuLabels() {
-  var lang = window._samtuThisPage ? window._samtuThisPage.lang : 'nb';
-  var editLabel = document.getElementById('samtu-edit-page-label');
-  var moveLabel = document.getElementById('samtu-move-label');
+function samtbuResetMenuLabels() {
+  var lang = window._samtbuThisPage ? window._samtbuThisPage.lang : 'nb';
+  var editLabel = document.getElementById('samt-bu-edit-page-label');
+  var moveLabel = document.getElementById('samt-bu-move-label');
   if (editLabel) editLabel.textContent = lang === 'en' ? 'Edit this page' : 'Rediger denne siden';
   if (moveLabel) moveLabel.textContent = lang === 'en' ? 'Move this chapter' : 'Flytt dette kapitlet';
 }
 
-function samtuLogout() {
+function samtbuLogout() {
   try {
     localStorage.removeItem(SAMT_TOKEN_KEY);
     localStorage.removeItem('samt-bu-gh-user');
     localStorage.removeItem('samt-bu-gh-name');
     localStorage.removeItem('samt-bu-gh-avatar');
-    localStorage.setItem('samtu-force-login', '1');
+    localStorage.setItem('samt-bu-force-login', '1');
   } catch(e) {}
-  samtuClearPermCache();
-  try { sessionStorage.removeItem('samtu-prs-v1'); } catch(e) {}
+  samtbuClearPermCache();
+  try { sessionStorage.removeItem('samt-bu-prs-v1'); } catch(e) {}
   updateAvatarDisplay();
 }
 
 function checkCollaboratorPermission(repo, callback) {
-  var cacheKey = 'samtu-perm2-' + repo + '-' + (localStorage.getItem('samt-bu-gh-user') || ''); // v3: bruker-spesifikk nøkkel
+  var cacheKey = 'samt-bu-perm2-' + repo + '-' + (localStorage.getItem('samt-bu-gh-user') || ''); // v3: bruker-spesifikk nøkkel
   var ttl = 3600000; // 1 hour
   try {
     var cached = JSON.parse(localStorage.getItem(cacheKey));
@@ -337,10 +369,10 @@ function checkCollaboratorPermission(repo, callback) {
    av samme fire operasjoner, uten å røre kallstedene. Eldre kall i denne filen
    snakker fortsatt direkte med api.github.com – de flyttes hit etter hvert.
 
-   Operasjoner: samtuPrList · samtuPrMerge · samtuPrClose · samtuPrComment
+   Operasjoner: samtbuPrList · samtbuPrMerge · samtbuPrClose · samtbuPrComment
 --------------------------------------------------------------------------- */
-var SAMTU_ORG = 'SAMT-X';
-var SAMTU_REPOS = [
+var SAMTBU_ORG = 'SAMT-X';
+var SAMTBU_REPOS = [
   'samt-bu-docs',
   'solution-samt-bu-docs',
   'team-architecture',
@@ -354,7 +386,7 @@ var SAMTU_REPOS = [
 ];
 
 // Lavnivå: ett kall mot GitHub-API-et. Kaster Error med GitHubs egen melding.
-function samtuGh(path, opts) {
+function samtbuGh(path, opts) {
   opts = opts || {};
   var headers = { 'Accept': 'application/vnd.github+json' };
   var token = getStoredToken();
@@ -379,9 +411,9 @@ function samtuGh(path, opts) {
 
 // Åpne forslag på tvers av alle repoer. Ett repo som feiler stopper ikke resten.
 // Returnerer en flat liste sortert med nyeste først.
-function samtuPrList() {
-  var jobs = SAMTU_REPOS.map(function(repo) {
-    return samtuGh('/repos/' + SAMTU_ORG + '/' + repo + '/pulls?state=open&per_page=30')
+function samtbuPrList() {
+  var jobs = SAMTBU_REPOS.map(function(repo) {
+    return samtbuGh('/repos/' + SAMTBU_ORG + '/' + repo + '/pulls?state=open&per_page=30')
       .then(function(prs) {
         return (prs || []).map(function(pr) {
           return {
@@ -410,30 +442,30 @@ function samtuPrList() {
 
 // Slå sammen. merge_method 'merge' er bevisst: gir «Merged» (lilla) i GitHub,
 // ikke «Closed» – som er forvirrende for ikke-tekniske bidragsytere.
-function samtuPrMerge(repo, number, commitTitle) {
-  return samtuGh('/repos/' + SAMTU_ORG + '/' + repo + '/pulls/' + number + '/merge', {
+function samtbuPrMerge(repo, number, commitTitle) {
+  return samtbuGh('/repos/' + SAMTBU_ORG + '/' + repo + '/pulls/' + number + '/merge', {
     method: 'PUT',
     body: { merge_method: 'merge', commit_title: commitTitle || undefined }
   });
 }
 
-function samtuPrClose(repo, number) {
-  return samtuGh('/repos/' + SAMTU_ORG + '/' + repo + '/pulls/' + number, {
+function samtbuPrClose(repo, number) {
+  return samtbuGh('/repos/' + SAMTBU_ORG + '/' + repo + '/pulls/' + number, {
     method: 'PATCH',
     body: { state: 'closed' }
   });
 }
 
 // PR-er er issues i GitHubs datamodell – kommentarer går mot issues-endepunktet.
-function samtuPrComment(repo, number, body) {
-  return samtuGh('/repos/' + SAMTU_ORG + '/' + repo + '/issues/' + number + '/comments', {
+function samtbuPrComment(repo, number, body) {
+  return samtbuGh('/repos/' + SAMTBU_ORG + '/' + repo + '/issues/' + number + '/comments', {
     method: 'POST',
     body: { body: body }
   });
 }
 
 // Promise-innpakning av den callback-baserte rettighetssjekken.
-function samtuCanWrite(repo) {
+function samtbuCanWrite(repo) {
   return new Promise(function(resolve) {
     checkCollaboratorPermission(repo, resolve);
   });
@@ -513,36 +545,36 @@ function suggestViaWorker(repo, branch, treeItems, deletePrefix, commitMessage, 
 }
 
 // Persistent bygg-sporing på tvers av sidenavigering (localStorage)
-var SAMTU_PENDING_KEY = 'samtu-build-pending';
-function samtuGetPending() {
-  try { return JSON.parse(localStorage.getItem(SAMTU_PENDING_KEY)); } catch(e) { return null; }
+var SAMTBU_PENDING_KEY = 'samt-bu-build-pending';
+function samtbuGetPending() {
+  try { return JSON.parse(localStorage.getItem(SAMTBU_PENDING_KEY)); } catch(e) { return null; }
 }
-function samtuIncrementPending() {
-  var p = samtuGetPending() || { count: 0 };
+function samtbuIncrementPending() {
+  var p = samtbuGetPending() || { count: 0 };
   var now = Date.now();
   var actor = localStorage.getItem('samt-bu-gh-user') || '';
   var newCount = (p.count || 0) + 1;
-  try { localStorage.setItem(SAMTU_PENDING_KEY, JSON.stringify({ count: newCount, firstSaveAt: p.firstSaveAt || now, lastSaveAt: now, seenCompleted: p.seenCompleted || 0, seenCancelled: p.seenCancelled || 0, actor: p.actor || actor, moduleRepo: p.moduleRepo || false })); } catch(e) {}
-  samtuShowPendingIndicator(newCount);
+  try { localStorage.setItem(SAMTBU_PENDING_KEY, JSON.stringify({ count: newCount, firstSaveAt: p.firstSaveAt || now, lastSaveAt: now, seenCompleted: p.seenCompleted || 0, seenCancelled: p.seenCancelled || 0, actor: p.actor || actor, moduleRepo: p.moduleRepo || false })); } catch(e) {}
+  samtbuShowPendingIndicator(newCount);
 }
-function samtuDecrementPending() {
-  var p = samtuGetPending();
+function samtbuDecrementPending() {
+  var p = samtbuGetPending();
   if (!p) return;
   var newCount = (p.count || 1) - 1;
   if (newCount <= 0) {
-    samtuClearPending();
+    samtbuClearPending();
   } else {
-    try { localStorage.setItem(SAMTU_PENDING_KEY, JSON.stringify({ count: newCount, firstSaveAt: p.firstSaveAt, lastSaveAt: p.lastSaveAt, seenCompleted: (p.seenCompleted || 0) + 1 })); } catch(e) {}
-    samtuShowPendingIndicator(newCount);
+    try { localStorage.setItem(SAMTBU_PENDING_KEY, JSON.stringify({ count: newCount, firstSaveAt: p.firstSaveAt, lastSaveAt: p.lastSaveAt, seenCompleted: (p.seenCompleted || 0) + 1 })); } catch(e) {}
+    samtbuShowPendingIndicator(newCount);
   }
 }
-function samtuClearPending() {
-  try { localStorage.removeItem(SAMTU_PENDING_KEY); } catch(e) {}
+function samtbuClearPending() {
+  try { localStorage.removeItem(SAMTBU_PENDING_KEY); } catch(e) {}
 }
-function samtuShowPendingIndicator(count) {
-  samtuShowPendingIndicatorWithTotal(count, null);
+function samtbuShowPendingIndicator(count) {
+  samtbuShowPendingIndicatorWithTotal(count, null);
 }
-function samtuShowPendingIndicatorWithTotal(count, totalActive) {
+function samtbuShowPendingIndicatorWithTotal(count, totalActive) {
   var ind = document.getElementById('qe-job-indicator');
   if (!ind) return;
   var isEn = document.documentElement.lang === 'en';
@@ -556,7 +588,7 @@ function samtuShowPendingIndicatorWithTotal(count, totalActive) {
   ind.dataset.building = '1';
   ind.style.display = 'flex';
 }
-function samtuShowDoneIndicator() {
+function samtbuShowDoneIndicator() {
   var ind = document.getElementById('qe-job-indicator');
   if (!ind) return;
   var isEn = document.documentElement.lang === 'en';
@@ -567,7 +599,7 @@ function samtuShowDoneIndicator() {
   ind.style.display = 'flex';
 }
 // Viser diskret indikator for eksternt bygg (ikke eget – ingen teller, lavere opasitet)
-function samtuShowExternalBuildIndicator() {
+function samtbuShowExternalBuildIndicator() {
   var ind = document.getElementById('qe-job-indicator');
   if (!ind || ind.dataset.building) return; // eget bygg pågår – ikke overstyr
   var isEn = document.documentElement.lang === 'en';
@@ -578,13 +610,13 @@ function samtuShowExternalBuildIndicator() {
   ind.dataset.external = '1';
   ind.style.display = 'flex';
 }
-function samtuHideExternalBuildIndicator() {
+function samtbuHideExternalBuildIndicator() {
   var ind = document.getElementById('qe-job-indicator');
   if (!ind || !ind.dataset.external) return;
   ind.style.display = 'none';
   delete ind.dataset.external;
 }
-function samtuHasVisibleDialog() {
+function samtbuHasVisibleDialog() {
   return ['qe-overlay', 'np-overlay', 'del-overlay', 'cm-overlay'].some(function(id) {
     var el = document.getElementById(id);
     return el && el.style.display !== 'none';
@@ -626,7 +658,7 @@ function samtuHasVisibleDialog() {
   }, true);
 
   // Egen bekreftelsesdialog – ingen nettleser-prefiks, full kontroll over tekst
-  function samtuConfirmNav(msg, onConfirm) {
+  function samtbuConfirmNav(msg, onConfirm) {
     var isEn = document.documentElement.lang === 'en';
     var wrap = document.createElement('div');
     wrap.style.cssText = 'position:fixed;inset:0;z-index:999999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45);';
@@ -676,20 +708,20 @@ function samtuHasVisibleDialog() {
     var msg = isEn
       ? 'The open dialog has unsaved content. Close the dialog and discard the changes?'
       : 'Den åpne dialogen har ulagret innhold. Vil du lukke denne dialogboksen og forkaste endringene?';
-    samtuConfirmNav(msg, function() { window.location.href = dest; });
+    samtbuConfirmNav(msg, function() { window.location.href = dest; });
   }, true);
 })();
 
 // Lydsignal ved ferdig bygg – beep (Web Audio) + tale (Web Speech)
 // Chrome blokkerer AudioContext og speechSynthesis fra setInterval uten brukergestus.
 // Løsning: lås opp begge på Lagre-klikk (gestus), gjenbruk konteksten ved ferdig bygg.
-var _samtuAudioCtx = null;
+var _samtbuAudioCtx = null;
 
-function samtuUnlockAudio() {
+function samtbuUnlockAudio() {
   // Opprett/gjenoppta AudioContext under brukergestus
   try {
-    if (!_samtuAudioCtx) _samtuAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (_samtuAudioCtx.state === 'suspended') _samtuAudioCtx.resume();
+    if (!_samtbuAudioCtx) _samtbuAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (_samtbuAudioCtx.state === 'suspended') _samtbuAudioCtx.resume();
   } catch(e) {}
   // Lås opp speechSynthesis med stille ytring under brukergestus
   try {
@@ -702,20 +734,20 @@ function samtuUnlockAudio() {
 // Spill av noter via Web Audio API.
 // notes: [[hz, startOffset, duration], ...]
 // Returnerer total varighet i ms (brukes til å forsinke talen).
-function _samtuPlayNotes(notes) {
+function _samtbuPlayNotes(notes) {
   var end = 0;
   notes.forEach(function(n) { end = Math.max(end, n[1] + n[2]); });
-  if (!_samtuAudioCtx) {
-    try { _samtuAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+  if (!_samtbuAudioCtx) {
+    try { _samtbuAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
   }
-  if (!_samtuAudioCtx) return Math.ceil(end * 1000);
-  _samtuAudioCtx.resume().then(function() {
-    var t = _samtuAudioCtx.currentTime;
+  if (!_samtbuAudioCtx) return Math.ceil(end * 1000);
+  _samtbuAudioCtx.resume().then(function() {
+    var t = _samtbuAudioCtx.currentTime;
     notes.forEach(function(n) {
       var hz = n[0], s = n[1], d = n[2];
-      var osc = _samtuAudioCtx.createOscillator();
-      var g = _samtuAudioCtx.createGain();
-      osc.connect(g); g.connect(_samtuAudioCtx.destination);
+      var osc = _samtbuAudioCtx.createOscillator();
+      var g = _samtbuAudioCtx.createGain();
+      osc.connect(g); g.connect(_samtbuAudioCtx.destination);
       osc.frequency.value = hz;
       // ADSR: rask attack (20ms), sustain, kort release (80ms eller 30% av notelengde)
       var rel = Math.min(0.08, d * 0.3);
@@ -731,7 +763,7 @@ function _samtuPlayNotes(notes) {
 }
 
 // Spill tale etter en forsinkelse (slik at lydsignal alltid kommer først)
-function _samtuSpeak(text, delayMs) {
+function _samtbuSpeak(text, delayMs) {
   try {
     setTimeout(function() {
       var u = new SpeechSynthesisUtterance(text);
@@ -742,10 +774,10 @@ function _samtuSpeak(text, delayMs) {
 }
 
 // Opptakt – to stigende pip (kalles når byggjobb starter)
-function samtuPlayStart(speechText) {
+function samtbuPlayStart(speechText) {
   // 600 Hz (120ms) → 900 Hz (200ms) → tale
-  var ms = _samtuPlayNotes([[600,0,0.12],[900,0.15,0.20]]);
-  _samtuSpeak(speechText || 'Build job started', ms + 150);
+  var ms = _samtbuPlayNotes([[600,0,0.12],[900,0.15,0.20]]);
+  _samtbuSpeak(speechText || 'Build job started', ms + 150);
 }
 
 // Hjelpefunksjon: tall til ord for TTS (0–10, ellers siffer)
@@ -755,22 +787,22 @@ function _numWord(n) {
 }
 
 // Seiersfanfare – C-E-G-C stigende (kalles når bygg er ferdig)
-function samtuPlaySuccess(speechText) {
+function samtbuPlaySuccess(speechText) {
   // C5–E5–G5–C6, siste tone lang for avslutningseffekt
-  var ms = _samtuPlayNotes([[523,0,0.22],[659,0.25,0.22],[784,0.50,0.22],[1047,0.75,0.60]]);
-  _samtuSpeak(speechText || 'Build job complete', ms + 150);
+  var ms = _samtbuPlayNotes([[523,0,0.22],[659,0.25,0.22],[784,0.50,0.22],[1047,0.75,0.60]]);
+  _samtbuSpeak(speechText || 'Build job complete', ms + 150);
 }
 
 // Wah-wah – tre fallende toner (kalles ved feil eller timeout)
-function samtuPlayFailure() {
+function samtbuPlayFailure() {
   // 400 → 300 → 220 Hz, siste tone lang
-  var ms = _samtuPlayNotes([[400,0,0.25],[300,0.28,0.25],[220,0.56,0.55]]);
-  _samtuSpeak('Build job failed', ms + 150);
+  var ms = _samtbuPlayNotes([[400,0,0.25],[300,0.28,0.25],[220,0.56,0.55]]);
+  _samtbuSpeak('Build job failed', ms + 150);
 }
 
 // Poll GitHub Actions workflow – brukes for rediger og slett (2s intervall)
 function startGhPoll(startTime, onDone, onError, onStatus) {
-  samtuPlayStart();
+  samtbuPlayStart();
   var token = getStoredToken();
   var h = { 'Accept': 'application/vnd.github+json' };
   if (token) h['Authorization'] = 'token ' + token;
@@ -789,9 +821,9 @@ function startGhPoll(startTime, onDone, onError, onStatus) {
         if (run.status === 'queued' || run.status === 'in_progress') {
           onStatus('Bygger…');
         } else if (run.status === 'completed') {
-          if (run.conclusion === 'success') { samtuPlaySuccess(); onDone(); }
+          if (run.conclusion === 'success') { samtbuPlaySuccess(); onDone(); }
           else if (run.conclusion === 'cancelled') { onStatus('Avløst – venter på nytt bygg…'); }
-          else { samtuPlayFailure(); onError(run.conclusion); }
+          else { samtbuPlayFailure(); onError(run.conclusion); }
         }
       })
       .catch(function() { onStatus('Sjekker…'); });
@@ -800,7 +832,7 @@ function startGhPoll(startTime, onDone, onError, onStatus) {
 
 // Poll URL direkte – brukes for ny side (same-origin, ingen token)
 function startUrlPoll(url, onDone, onError, onStatus, startTime) {
-  samtuPlayStart();
+  samtbuPlayStart();
   var attempts = 0;
   var _checkingApi = false;
   var timer = setInterval(function() {
@@ -824,24 +856,24 @@ function startUrlPoll(url, onDone, onError, onStatus, startTime) {
               }
             }
           }
-          if (!run) { clearInterval(timer); samtuPlayFailure(); onError('timeout'); return; }
+          if (!run) { clearInterval(timer); samtbuPlayFailure(); onError('timeout'); return; }
           if (run.status === 'in_progress' || run.status === 'queued') {
             attempts = 0; // Bygg pågår – nullstill teller og fortsett poll
           } else if (run.status === 'completed' && run.conclusion === 'success') {
-            clearInterval(timer); samtuPlaySuccess(); onDone();
+            clearInterval(timer); samtbuPlaySuccess(); onDone();
           } else if (run.status === 'completed' && run.conclusion === 'cancelled') {
             attempts = 0; onStatus('Avbrutt – venter på nytt bygg…');
           } else {
-            clearInterval(timer); samtuPlayFailure(); onError(run.conclusion || 'timeout');
+            clearInterval(timer); samtbuPlayFailure(); onError(run.conclusion || 'timeout');
           }
         })
-        .catch(function() { _checkingApi = false; clearInterval(timer); samtuPlayFailure(); onError('timeout'); });
+        .catch(function() { _checkingApi = false; clearInterval(timer); samtbuPlayFailure(); onError('timeout'); });
       return;
     }
     fetch(url + (url.indexOf('?') >= 0 ? '&' : '?') + '_cf=' + Date.now(),
           { method: 'HEAD', cache: 'no-store' })
       .then(function(r) {
-        if (r.ok) { samtuPlaySuccess(); onDone(); }
+        if (r.ok) { samtbuPlaySuccess(); onDone(); }
         else onStatus(attempts);
       })
       .catch(function() { onStatus('Venter…'); });
@@ -884,15 +916,15 @@ updateAvatarDisplay();
 
 // Gjenopprett pending-spinner ved sideinnlasting og tell ned per ferdig bygg
 setTimeout(function() {
-  var p = samtuGetPending();
+  var p = samtbuGetPending();
   if (!p || !p.count || !p.firstSaveAt) return;
-  if ((Date.now() - p.firstSaveAt) > 600000) { samtuClearPending(); return; } // > 10 min – anta ferdig
-  samtuShowPendingIndicator(p.count);
+  if ((Date.now() - p.firstSaveAt) > 600000) { samtbuClearPending(); return; } // > 10 min – anta ferdig
+  samtbuShowPendingIndicator(p.count);
   var token = getStoredToken();
   var h = { 'Accept': 'application/vnd.github+json' };
   if (token) h['Authorization'] = 'token ' + token;
   function checkCompletions() {
-    var p2 = samtuGetPending();
+    var p2 = samtbuGetPending();
     if (!p2 || !p2.count) { clearInterval(resumeTimer); return; }
     fetch('https://api.github.com/repos/SAMT-X/samt-bu-docs/actions/workflows/hugo.yml/runs?per_page=20', { headers: h, cache: 'no-store' })
       .then(function(r) { return r.json(); })
@@ -929,14 +961,14 @@ setTimeout(function() {
         if (allMyDone) {
           // Alle mine endringer er deployet
           clearInterval(resumeTimer);
-          samtuClearPending();
-          samtuShowDoneIndicator();
+          samtbuClearPending();
+          samtbuShowDoneIndicator();
           var doneSpeech = 'All your documentation jobs completed';
           if (othersActive > 0) {
             doneSpeech += ', ' + _numWord(othersActive) + ' other update ' + (othersActive === 1 ? 'job' : 'jobs') + ' in progress';
           }
-          samtuPlaySuccess(doneSpeech);
-          if (!samtuHasVisibleDialog()) {
+          samtbuPlaySuccess(doneSpeech);
+          if (!samtbuHasVisibleDialog()) {
             setTimeout(function() {
               window.location.href = window.location.href.split('?')[0] + '?_=' + Date.now();
             }, 1800);
@@ -945,21 +977,21 @@ setTimeout(function() {
           // Nye fullføringer eller kanseller – oppdater teller og lagret tilstand
           var newCount = Math.max(1, (p2.count || 0) - newCompletions);
           try {
-            localStorage.setItem(SAMTU_PENDING_KEY, JSON.stringify({
+            localStorage.setItem(SAMTBU_PENDING_KEY, JSON.stringify({
               count: newCount, firstSaveAt: p2.firstSaveAt, lastSaveAt: p2.lastSaveAt,
               seenCompleted: myCompletedTotal, seenCancelled: myCancelledTotal, actor: p2.actor,
               moduleRepo: p2.moduleRepo || false
             }));
           } catch(e) {}
-          samtuShowPendingIndicatorWithTotal(newCount, totalActive);
+          samtbuShowPendingIndicatorWithTotal(newCount, totalActive);
           if (newCompletions > 0) {
             var completedWord = newCompletions === 1 ? 'One of your documentation jobs completed' : _numWord(newCompletions) + ' of your documentation jobs completed';
             var remainingWord = newCount === 1 ? 'one remaining' : _numWord(newCount) + ' remaining';
-            samtuPlaySuccess(completedWord + ', ' + remainingWord);
+            samtbuPlaySuccess(completedWord + ', ' + remainingWord);
           }
         } else {
           // Ingen nye hendelser ennå
-          samtuShowPendingIndicatorWithTotal(p2.count, totalActive);
+          samtbuShowPendingIndicatorWithTotal(p2.count, totalActive);
         }
       })
       .catch(function() {});
@@ -1066,12 +1098,12 @@ setTimeout(function() {
 <!-- Avatar-dropdown: vis bruker og logg ut -->
 <script>
 (function() {
-  var wrap  = document.getElementById('samtu-avatar-wrap');
-  var img   = document.getElementById('samtu-user-avatar');
-  var menu  = document.getElementById('samtu-avatar-menu');
-  var logoutBtn = document.getElementById('samtu-logout-btn');
-  var switchBtn = document.getElementById('samtu-switch-btn');
-  var loginBtn2 = document.getElementById('samtu-login-btn');
+  var wrap  = document.getElementById('samt-bu-avatar-wrap');
+  var img   = document.getElementById('samt-bu-user-avatar');
+  var menu  = document.getElementById('samt-bu-avatar-menu');
+  var logoutBtn = document.getElementById('samt-bu-logout-btn');
+  var switchBtn = document.getElementById('samt-bu-switch-btn');
+  var loginBtn2 = document.getElementById('samt-bu-login-btn');
   if (!wrap) return;
 
   if (loginBtn2) {
@@ -1100,8 +1132,8 @@ setTimeout(function() {
     switchBtn.addEventListener('click', function(e) {
       e.preventDefault();
       menu.style.display = 'none';
-      samtuLogout();
-      try { localStorage.removeItem('samtu-force-login'); } catch(ex) {}
+      samtbuLogout();
+      try { localStorage.removeItem('samt-bu-force-login'); } catch(ex) {}
       doGitHubLogin(function() { fetchCurrentUser(function() {}); });
     });
   }
@@ -1110,7 +1142,7 @@ setTimeout(function() {
     logoutBtn.addEventListener('click', function(e) {
       e.preventDefault();
       menu.style.display = 'none';
-      samtuLogout();
+      samtbuLogout();
     });
   }
 
@@ -1409,7 +1441,7 @@ setTimeout(function() {
 
   document.getElementById('np-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    samtuUnlockAudio(); // lås opp lyd under brukergestus
+    samtbuUnlockAudio(); // lås opp lyd under brukergestus
 
     var submitBtn = document.getElementById('np-submit');
     submitBtn.disabled = true;
@@ -1527,7 +1559,7 @@ setTimeout(function() {
               npNewPageUrl = parentUrl + slug + '/';
             }
             showNpBuildPanel();
-            samtuIncrementPending();
+            samtbuIncrementPending();
             npPollBuild(startTime);
           } else {
             setNpStatus(npLang === 'en' ? '\u2713 Pull request sent' : '\u2713 Pull request sendt');
@@ -1707,7 +1739,7 @@ setTimeout(function() {
       },
       function onError(reason) {
         clearInterval(npActivePollTimer); npActivePollTimer = null;
-        samtuDecrementPending();
+        samtbuDecrementPending();
         setNpStatus((lang === 'en' ? '⚠ Timed out: ' : '⚠ Tidsavbrudd: ') + reason);
       },
       function onStatus(secs) { setNpStatus(lang === 'en' ? 'Updating site (' + secs + 's)…' : 'Nettsted oppdateres (' + secs + ' sek)…'); },
@@ -1836,7 +1868,7 @@ setTimeout(function() {
   function doCommit() {
     var token = getStoredToken();
     if (!token) { closeDialog(); return; }
-    samtuUnlockAudio();
+    samtbuUnlockAudio();
 
     var confirmBtn = document.getElementById('del-confirm-btn');
     var cancelBtn  = document.getElementById('del-cancel');
@@ -1885,7 +1917,7 @@ setTimeout(function() {
         .then(function(result) {
           if (canWrite) {
             showBuildPanel();
-            samtuIncrementPending();
+            samtbuIncrementPending();
             pollBuild(startTime);
           } else {
             showBuildPanel();
@@ -2026,7 +2058,7 @@ setTimeout(function() {
     var pageUrl = window.location.href.split('?')[0];
     var attempts = 0;
 
-    samtuPlayStart();
+    samtbuPlayStart();
 
     document.getElementById('del-panel-done').onclick = function() {
       clearInterval(activePollTimer); activePollTimer = null;
@@ -2035,7 +2067,7 @@ setTimeout(function() {
 
     function onDone() {
       clearInterval(activePollTimer); activePollTimer = null;
-      samtuPlaySuccess();
+      samtbuPlaySuccess();
       var doneBtn = document.getElementById('del-panel-done');
       if (doneBtn) doneBtn.style.display = 'inline-block';
       var secs = 3;
@@ -2348,7 +2380,7 @@ setTimeout(function() {
     if (!token || !qeEditor) return;
     var saveBtn = document.getElementById('qe-save-btn');
     if (saveBtn.onclick) return; // er i "lukk"-modus – la onclick håndtere det
-    samtuUnlockAudio(); // lås opp lyd under brukergestus
+    samtbuUnlockAudio(); // lås opp lyd under brukergestus
     saveBtn.disabled = true;
     saveBtn.textContent = qeLang === 'en' ? 'Saving…' : 'Lagrer…';
     setStatus('');
@@ -2398,10 +2430,10 @@ setTimeout(function() {
       var w = document.getElementById('qe-build-warning');
       if (w) w.style.display = 'none';
       var _isModuleRepo = (qeRepo !== 'samt-bu-docs');
-      samtuIncrementPending();
+      samtbuIncrementPending();
       if (_isModuleRepo) {
-        var _mp = samtuGetPending();
-        if (_mp) { _mp.moduleRepo = true; try { localStorage.setItem(SAMTU_PENDING_KEY, JSON.stringify(_mp)); } catch(e) {} }
+        var _mp = samtbuGetPending();
+        if (_mp) { _mp.moduleRepo = true; try { localStorage.setItem(SAMTBU_PENDING_KEY, JSON.stringify(_mp)); } catch(e) {} }
       }
       pollQeBuild(startTime, qeOldEtag, _isModuleRepo);
     }
@@ -2499,7 +2531,7 @@ setTimeout(function() {
     }
 
     if (oldEtag) {
-      samtuPlayStart();
+      samtbuPlayStart();
       // ETag-deteksjon: vent til Cloudflare serverer ny versjon (same-origin HEAD-poll)
       var _checkingApi = false;
       qePollTimer = setInterval(function() {
@@ -2522,25 +2554,25 @@ setTimeout(function() {
                   }
                 }
               }
-              if (!run) { clearInterval(qePollTimer); qePollTimer = null; samtuPlayFailure(); setStatus('⚠ Tidsavbrudd'); return; }
+              if (!run) { clearInterval(qePollTimer); qePollTimer = null; samtbuPlayFailure(); setStatus('⚠ Tidsavbrudd'); return; }
               if (run.status === 'in_progress' || run.status === 'queued') {
                 attempts = 0; // Bygg pågår – nullstill teller og fortsett ETag-poll
               } else if (run.status === 'completed' && run.conclusion === 'success') {
-                clearInterval(qePollTimer); qePollTimer = null; samtuPlaySuccess(); onBuildDone();
+                clearInterval(qePollTimer); qePollTimer = null; samtbuPlaySuccess(); onBuildDone();
               } else if (run.status === 'completed' && run.conclusion === 'cancelled') {
                 attempts = 0; setStatus(lang === 'en' ? 'Cancelled – waiting for new build…' : 'Avbrutt – venter på nytt bygg…');
               } else {
-                clearInterval(qePollTimer); qePollTimer = null; samtuPlayFailure(); setStatus('⚠ ' + (run.conclusion || 'Tidsavbrudd'));
+                clearInterval(qePollTimer); qePollTimer = null; samtbuPlayFailure(); setStatus('⚠ ' + (run.conclusion || 'Tidsavbrudd'));
               }
             })
-            .catch(function() { _checkingApi = false; clearInterval(qePollTimer); qePollTimer = null; samtuPlayFailure(); setStatus('⚠ Tidsavbrudd'); });
+            .catch(function() { _checkingApi = false; clearInterval(qePollTimer); qePollTimer = null; samtbuPlayFailure(); setStatus('⚠ Tidsavbrudd'); });
           return;
         }
         fetch(url + (url.indexOf('?') >= 0 ? '&' : '?') + '_cf=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
           .then(function(r) {
             var newEtag = r.headers.get('etag') || r.headers.get('last-modified');
             if (r.ok && newEtag && newEtag !== oldEtag) {
-              if (!isModuleRepo) { samtuPlaySuccess(); onBuildDone(); return; }
+              if (!isModuleRepo) { samtbuPlaySuccess(); onBuildDone(); return; }
               // Modul-repo-redigering: ETag kan ha endret seg fra en annen jobb. Verifiser
               // at en repository_dispatch-kjøring faktisk er ferdig før vi erklærer done.
               oldEtag = newEtag; // oppdater slik at neste poll ikke re-trigger sjekken
@@ -2556,10 +2588,10 @@ setTimeout(function() {
                       if (new Date(dr.created_at).getTime() >= startTime - 30000 && dr.status === 'completed' && dr.conclusion === 'success') { ok = true; break; }
                     }
                   }
-                  if (ok) { samtuPlaySuccess(); onBuildDone(); }
+                  if (ok) { samtbuPlaySuccess(); onBuildDone(); }
                   // else: fortsett polling – neste ETag-endring er trolig vår dispatch-jobb
                 })
-                .catch(function() { samtuPlaySuccess(); onBuildDone(); }); // fail-safe: gå videre ved API-feil
+                .catch(function() { samtbuPlaySuccess(); onBuildDone(); }); // fail-safe: gå videre ved API-feil
             } else setStatus(lang === 'en' ? 'Updating site (' + attempts + 's)…' : 'Nettsted oppdateres (' + attempts + ' sek)…');
           })
           .catch(function() { setStatus('Venter…'); });
@@ -2632,7 +2664,7 @@ setTimeout(function() {
   function stopBgFastPoll() {
     if (bgFastTimer) { clearInterval(bgFastTimer); bgFastTimer = null; }
     bgExternalRun = null;
-    samtuHideExternalBuildIndicator();
+    samtbuHideExternalBuildIndicator();
   }
 
   // Start rask ETag-poll (5s) for å oppdage at eksternt bygg er ferdig
@@ -2657,7 +2689,7 @@ setTimeout(function() {
 
   // Sjekk GitHub Actions API for aktive bygg som ikke er egne (krever innlogget bruker)
   function checkExternalBuilds() {
-    var p = samtuGetPending();
+    var p = samtbuGetPending();
     if (p && p.count) { stopBgFastPoll(); return; } // eget bygg pågår – ikke interferér
     var token = getStoredToken();
     if (!token) { stopBgFastPoll(); return; } // ikke innlogget – kan ikke sjekke API
@@ -2673,7 +2705,7 @@ setTimeout(function() {
         }
         if (activeRun) {
           bgExternalRun = activeRun.id;
-          samtuShowExternalBuildIndicator();
+          samtbuShowExternalBuildIndicator();
           startBgFastPoll();
         } else {
           stopBgFastPoll();
@@ -2699,14 +2731,14 @@ setTimeout(function() {
       .then(function(r) {
         var newEtag = r.headers.get('etag') || r.headers.get('last-modified');
         if (newEtag && newEtag !== knownEtag) {
-          var p = samtuGetPending();
+          var p = samtbuGetPending();
           var tooSoon = p && p.count && p.lastSaveAt && (Date.now() - p.lastSaveAt) < 60000;
           if (tooSoon) { checkExternalBuilds(); return; } // for tidlig – sjekk likevel
           knownEtag = newEtag;
           clearInterval(bgTimer);
           if (p && p.count) {
             // Egne ventende endringer – last inn, men ikke hvis en dialog er åpen
-            if (!samtuHasVisibleDialog()) {
+            if (!samtbuHasVisibleDialog()) {
               window.location.href = window.location.href.split('?')[0] + '?_=' + Date.now();
             } else {
               var banner = document.getElementById('page-update-banner');
@@ -2715,7 +2747,7 @@ setTimeout(function() {
           } else if (bgExternalRun) {
             // Eksternt bygg er ferdig – auto-last inn, men ikke hvis en dialog er åpen
             stopBgFastPoll();
-            if (!samtuHasVisibleDialog()) {
+            if (!samtbuHasVisibleDialog()) {
               window.location.href = pageUrl + '?_=' + Date.now();
             } else {
               var banner = document.getElementById('page-update-banner');
@@ -3048,7 +3080,7 @@ setTimeout(function() {
     isEn ? 'Give feedback' : 'Gi kommentar';
 
   function openPanel() {
-    if (window.samtuCloseHistory) window.samtuCloseHistory();
+    if (window.samtbuCloseHistory) window.samtbuCloseHistory();
     panel.style.display = 'block';
     panelOpen = true;
     if (!fetched) fetchIssues();
@@ -3057,7 +3089,7 @@ setTimeout(function() {
     panel.style.display = 'none';
     panelOpen = false;
   }
-  window.samtuCloseIssuesPanel = closePanel;
+  window.samtbuCloseIssuesPanel = closePanel;
 
   btn.addEventListener('click', function(e) {
     e.stopPropagation();
@@ -3483,7 +3515,7 @@ setTimeout(function() {
   }
 
   function openHistory() {
-    if (window.samtuCloseIssuesPanel) window.samtuCloseIssuesPanel();
+    if (window.samtbuCloseIssuesPanel) window.samtbuCloseIssuesPanel();
     dialog.style.display = 'block';
     _historyRuns = null;
     fetchHistory();
@@ -3499,7 +3531,7 @@ setTimeout(function() {
     _historyLiveTimer = null;
     _historyFetchTimer = null;
   }
-  window.samtuCloseHistory = closeHistory;
+  window.samtbuCloseHistory = closeHistory;
 
   if (tabMineBtn) tabMineBtn.addEventListener('click', function() {
     if (_historyMode !== 'mine') { setTab('mine'); _historyRuns = null; fetchHistory(); }
@@ -3509,7 +3541,7 @@ setTimeout(function() {
   });
 
   indicator.addEventListener('click', function(e) {
-    // Ikke åpne dialog hvis klikket var på en lenke inne i indikatoren (f.eks. samtuShowDoneIndicator)
+    // Ikke åpne dialog hvis klikket var på en lenke inne i indikatoren (f.eks. samtbuShowDoneIndicator)
     if (e.target.tagName === 'A' || e.target.closest('a')) return;
     if (dialog.style.display !== 'none') {
       closeHistory();
@@ -3533,7 +3565,7 @@ setTimeout(function() {
 
 <!-- Dialog-persistens: sessionStorage – dialogen overlever sidenavigering (lik Flytt-mønsteret) -->
 <script>
-var _dlgKey = 'samtu-dialog-state';
+var _dlgKey = 'samt-bu-dialog-state';
 function _dlgGet()   { try { return JSON.parse(sessionStorage.getItem(_dlgKey)); } catch(e) { return null; } }
 function _dlgSet(s)  { try { sessionStorage.setItem(_dlgKey, JSON.stringify(s)); } catch(e) {} }
 function _dlgClear() { try { sessionStorage.removeItem(_dlgKey); } catch(e) {} }
@@ -3575,7 +3607,7 @@ function _dlgSave() {
 
 <!-- Flytt-modus: globale funksjoner – minifier omdøper aldri globale deklarasjoner -->
 <script>
-var _mvKey = 'samtu-move-state';
+var _mvKey = 'samt-bu-move-state';
 
 function _mvGet() { try { return JSON.parse(sessionStorage.getItem(_mvKey)); } catch(e) { return null; } }
 function _mvSet(s) { try { sessionStorage.setItem(_mvKey, JSON.stringify(s)); } catch(e) {} }
@@ -3591,7 +3623,7 @@ function _mvRestoreMenu() {
 
 function _mvApply(state) {
   if (!state) return;
-  var pg = window._samtuThisPage || {};
+  var pg = window._samtbuThisPage || {};
   var isEn = (pg.lang || state.lang) === 'en';
   var doCancel = function() { _mvClear(); window.location.reload(); };
 
@@ -3729,12 +3761,12 @@ function _mvOpenBuildDialog(startTime, sourcePerm, isEn, oldEtag) {
   overlay.appendChild(dlg);
   document.body.appendChild(overlay);
 
-  samtuIncrementPending();
+  samtbuIncrementPending();
   var timer;
 
   function onBuildDone() {
     clearInterval(timer);
-    samtuDecrementPending();
+    samtbuDecrementPending();
     statusEl.textContent = isEn ? '✓ Published! Navigating to source page…' : '✓ Publisert! Navigerer til kildesiden…';
     doneBtn.style.display = 'inline-block';
     doneBtn.onclick = function() { overlay.remove(); window.location.href = sourcePerm + '?_=' + Date.now(); };
@@ -3742,13 +3774,13 @@ function _mvOpenBuildDialog(startTime, sourcePerm, isEn, oldEtag) {
   }
   function onBuildError(reason) {
     clearInterval(timer);
-    samtuDecrementPending();
+    samtbuDecrementPending();
     statusEl.textContent = '⚠ ' + (reason || 'Feil');
   }
 
   if (oldEtag) {
     // ETag-basert polling – identisk logikk som pollQeBuild (inkl. GH Actions-fallback etter 180s)
-    samtuPlayStart();
+    samtbuPlayStart();
     var attempts = 0;
     var _checking = false;
     timer = setInterval(function() {
@@ -3769,37 +3801,37 @@ function _mvOpenBuildDialog(startTime, sourcePerm, isEn, oldEtag) {
                 if (new Date(data.workflow_runs[i].created_at).getTime() >= startTime - 30000) { run = data.workflow_runs[i]; break; }
               }
             }
-            if (!run) { clearInterval(timer); samtuPlayFailure(); onBuildError(isEn ? 'Timeout' : 'Tidsavbrudd'); return; }
+            if (!run) { clearInterval(timer); samtbuPlayFailure(); onBuildError(isEn ? 'Timeout' : 'Tidsavbrudd'); return; }
             if (run.status === 'in_progress' || run.status === 'queued') {
               attempts = 0; // Bygg pågår – nullstill teller og fortsett ETag-poll
             } else if (run.status === 'completed' && run.conclusion === 'success') {
-              clearInterval(timer); samtuPlaySuccess(); onBuildDone();
+              clearInterval(timer); samtbuPlaySuccess(); onBuildDone();
             } else if (run.status === 'completed' && run.conclusion === 'cancelled') {
               attempts = 0; statusEl.textContent = isEn ? 'Cancelled – waiting for new build…' : 'Avbrutt – venter på nytt bygg…';
             } else {
-              clearInterval(timer); samtuPlayFailure(); onBuildError(run.conclusion || 'timeout');
+              clearInterval(timer); samtbuPlayFailure(); onBuildError(run.conclusion || 'timeout');
             }
           })
-          .catch(function() { _checking = false; clearInterval(timer); samtuPlayFailure(); onBuildError(isEn ? 'Timeout' : 'Tidsavbrudd'); });
+          .catch(function() { _checking = false; clearInterval(timer); samtbuPlayFailure(); onBuildError(isEn ? 'Timeout' : 'Tidsavbrudd'); });
         return;
       }
       fetch(sourcePerm + '?_cf=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
         .then(function(r) {
           var newEtag = r.headers.get('etag') || r.headers.get('last-modified');
-          if (r.ok && newEtag && newEtag !== oldEtag) { samtuPlaySuccess(); onBuildDone(); }
+          if (r.ok && newEtag && newEtag !== oldEtag) { samtbuPlaySuccess(); onBuildDone(); }
           else statusEl.textContent = isEn ? 'Updating site (' + attempts + 's)…' : 'Nettstedet oppdateres (' + attempts + ' sek)…';
         })
         .catch(function() {});
     }, 1000);
   } else {
-    // Fallback: startGhPoll (håndterer samtuPlayStart/Success/Failure internt)
+    // Fallback: startGhPoll (håndterer samtbuPlayStart/Success/Failure internt)
     timer = startGhPoll(startTime, onBuildDone, onBuildError, function(msg) {
       if (!overlay.isConnected) { clearInterval(timer); return; }
       statusEl.textContent = msg || '';
     });
   }
 
-  var doClose = function() { clearInterval(timer); samtuDecrementPending(); overlay.remove(); };
+  var doClose = function() { clearInterval(timer); samtbuDecrementPending(); overlay.remove(); };
   closeBtn.onclick = doClose; xBtn.onclick = doClose;
 }
 
@@ -3833,10 +3865,10 @@ function _mvCommit(token, repo, files, msg) {
 }
 
 function _mvDoHit(position) {
-  samtuUnlockAudio(); // Lås opp Web Audio under brukergestus (klikk)
+  samtbuUnlockAudio(); // Lås opp Web Audio under brukergestus (klikk)
   var state = _mvGet();
   if (!state) return;
-  var pg = window._samtuThisPage || {};
+  var pg = window._samtbuThisPage || {};
   var token = getStoredToken();
   if (!token) { doGitHubLogin(function() { _mvDoHit(position); }); return; }
   var isEn = state.lang === 'en';
@@ -3886,9 +3918,9 @@ function enterMoveMode(repo, dirPath, lang, permalink) {
     doGitHubLogin(function() { enterMoveMode(repo, dirPath, lang, permalink); });
     return;
   }
-  var pg = window._samtuThisPage || {};
+  var pg = window._samtbuThisPage || {};
   var state = {repo:repo, dirPath:dirPath, lang:lang, permalink:permalink,
-    title:pg.title||'', siblings:window._samtuMoveSiblings||[]};
+    title:pg.title||'', siblings:window._samtbuMoveSiblings||[]};
   _mvSet(state);
   _mvApply(state);
 }
@@ -3982,13 +4014,13 @@ function _prLoad(force) {
   listEl.innerHTML = '<div class="pr-empty pr-loading">' + (isEn ? 'Loading…' : 'Laster…') + '</div>';
   _prSetStatus('');
 
-  samtuPrList().then(function(prs) {
+  samtbuPrList().then(function(prs) {
     _prCache = { ts: Date.now(), prs: prs };
     // Hent skrivetilgang for de repoene som faktisk har forslag – cachet 1 t.
     var repos = [];
     prs.forEach(function(p) { if (repos.indexOf(p.repo) === -1) repos.push(p.repo); });
     return Promise.all(repos.map(function(r) {
-      return samtuCanWrite(r).then(function(ok) { _prPerm[r] = ok; });
+      return samtbuCanWrite(r).then(function(ok) { _prPerm[r] = ok; });
     })).then(function() { return prs; });
   }).then(function(prs) {
     _prRender(prs);
@@ -4101,13 +4133,13 @@ function _prExecute(row, btn, repo, number, act) {
     : (isEn ? 'Declining…' : 'Avslår…');
 
   var op = act === 'merge'
-    ? samtuPrMerge(repo, number)
-    : samtuPrClose(repo, number);
+    ? samtbuPrMerge(repo, number)
+    : samtbuPrClose(repo, number);
 
   op.then(function() {
     // Kommentaren er en høflighet, ikke en forutsetning – en feil her skal ikke
     // få handlingen til å se mislykket ut.
-    return samtuPrComment(repo, number,
+    return samtbuPrComment(repo, number,
       act === 'merge' ? _prMergeComment() : _prCloseComment()
     ).catch(function() { return null; });
   }).then(function() {
@@ -4140,18 +4172,18 @@ function _prExecute(row, btn, repo, number, act) {
 // Viser admin-gruppen i Endre-menyen dersom brukeren har skrivetilgang.
 // Gates på repoet for GJELDENDE side – rettighetssjekk på tvers av ti repoer
 // ved hver sidelast ville vært for dyrt. Skjuling er kosmetikk, ikke sikkerhet.
-function samtuUpdateAdminMenu() {
-  if (!window._samtuThisPage) return;
+function samtbuUpdateAdminMenu() {
+  if (!window._samtbuThisPage) return;
   if (!getStoredToken()) {
-    var g0 = document.getElementById('samtu-admin-group');
-    var i0 = document.getElementById('samtu-admin-prs');
+    var g0 = document.getElementById('samt-bu-admin-group');
+    var i0 = document.getElementById('samt-bu-admin-prs');
     if (g0) g0.style.display = 'none';
     if (i0) i0.style.display = 'none';
     return;
   }
-  checkCollaboratorPermission(window._samtuThisPage.repo, function(canWrite) {
-    var group = document.getElementById('samtu-admin-group');
-    var item  = document.getElementById('samtu-admin-prs');
+  checkCollaboratorPermission(window._samtbuThisPage.repo, function(canWrite) {
+    var group = document.getElementById('samt-bu-admin-group');
+    var item  = document.getElementById('samt-bu-admin-prs');
     if (!group || !item) return;
     group.style.display = canWrite ? 'block' : 'none';
     item.style.display  = canWrite ? 'block' : 'none';
@@ -4162,20 +4194,20 @@ function samtuUpdateAdminMenu() {
 // Antall åpne forslag i menyetiketten. Bruker sessionStorage slik at tallet
 // ikke koster ti API-kall ved hver sidevisning.
 function _prUpdateMenuCount() {
-  var label = document.getElementById('samtu-admin-prs-label');
+  var label = document.getElementById('samt-bu-admin-prs-label');
   if (!label) return;
-  var lang = (window._samtuThisPage && window._samtuThisPage.lang) || 'nb';
+  var lang = (window._samtbuThisPage && window._samtbuThisPage.lang) || 'nb';
   var base = lang === 'en' ? 'Handle suggestions' : 'Behandle forslag';
 
   function paint(n) { label.textContent = n > 0 ? base + ' (' + n + ')' : base; }
 
   try {
-    var c = JSON.parse(sessionStorage.getItem('samtu-prs-v1'));
+    var c = JSON.parse(sessionStorage.getItem('samt-bu-prs-v1'));
     if (c && (Date.now() - c.ts) < 300000) { paint(c.n); return; }
   } catch(e) {}
 
-  samtuPrList().then(function(prs) {
-    try { sessionStorage.setItem('samtu-prs-v1', JSON.stringify({ ts: Date.now(), n: prs.length })); } catch(e) {}
+  samtbuPrList().then(function(prs) {
+    try { sessionStorage.setItem('samt-bu-prs-v1', JSON.stringify({ ts: Date.now(), n: prs.length })); } catch(e) {}
     paint(prs.length);
   }).catch(function() {});
 }
@@ -4189,7 +4221,7 @@ function _prUpdateMenuCount() {
 
   var refreshBtn = document.getElementById('pr-refresh-btn');
   if (refreshBtn) refreshBtn.addEventListener('click', function() {
-    try { sessionStorage.removeItem('samtu-prs-v1'); } catch(e) {}
+    try { sessionStorage.removeItem('samt-bu-prs-v1'); } catch(e) {}
     _prCache = null;
     _prLoad(true);
   });
@@ -4209,6 +4241,6 @@ function _prUpdateMenuCount() {
     closePrDialog();
   });
 
-  samtuUpdateAdminMenu();
+  samtbuUpdateAdminMenu();
 })();
 </script>
