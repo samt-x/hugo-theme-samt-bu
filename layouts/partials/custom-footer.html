@@ -512,17 +512,27 @@ function samtbuPrList() {
     return samtbuGh('/repos/' + SAMTBU_ORG + '/' + repo + '/pulls?state=open&per_page=30')
       .then(function(prs) {
         return (prs || []).map(function(pr) {
+          /* Forslag fra brukere uten skrivetilgang opprettes av workeren med
+             samt-x-bot sitt token, så pr.user er alltid boten. Den ekte
+             forslagsstilleren ligger i grenavnet (makePrBranch: <login>/suggest-…),
+             som følger med i lista – ingen ekstra API-kall. */
+          var branch   = (pr.head && pr.head.ref) || '';
+          var author   = (pr.user && pr.user.login) || '';
+          var viaProxy = false;
+          var m = branch.match(/^([A-Za-z0-9](?:[A-Za-z0-9._-]*))\/suggest-/);
+          if (m) { author = m[1]; viaProxy = true; }
           return {
             repo: repo,
             number: pr.number,
             title: pr.title,
-            author: (pr.user && pr.user.login) || '',
-            authorUrl: (pr.user && pr.user.html_url) || '',
+            author: author,
+            botLogin: (pr.user && pr.user.login) || '',
+            viaProxy: viaProxy,
             createdAt: pr.created_at,
             updatedAt: pr.updated_at,
             url: pr.html_url,
             draft: !!pr.draft,
-            branch: pr.head && pr.head.ref
+            branch: branch
           };
         });
       })
@@ -3313,7 +3323,11 @@ setTimeout(function() {
   .pr-btn-close:hover { background:#fff5f5; }
   .pr-note { font-size:13px; margin-top:.5rem; padding:.5rem .8rem; border-radius:4px; line-height:1.5; }
   .pr-note-err { background:#fff0f0; border:1px solid #f5c6c6; color:#900; }
-  .pr-note-ok  { background:#eef8f2; border:1px solid #b8ddc6; color:#1a5c3a; }
+  /* Spørsmål (gul) og resultat (grønn) må se ULIKE ut – begge var grønne før,
+     så «Avslått, med kommentar» lignet på «klikk Bekreft for å fortsette». */
+  .pr-note-ask { background:#fffbeb; border:1px solid #f5d78a; color:#7c4f00; }
+  .pr-note-ok  { background:#eef8f2; border:1px solid #b8ddc6; color:#1a5c3a; font-weight:600; }
+  .pr-row-done { background:#f7fbf8; }
   .pr-empty { padding:2rem 1.4rem; color:#778; font-style:italic; font-size:15px; }
 </style>
 <div id="pr-overlay" style="display:none; position:fixed; left:290px; top:145px; width:720px; height:calc(100vh - 220px); z-index:99998; flex-direction:column; background:#fff; box-shadow:0 4px 28px rgba(0,0,0,.32); border-radius:6px; overflow:hidden; min-width:420px; min-height:280px;">
@@ -4165,7 +4179,13 @@ function _prRender(prs) {
       +     (isEn ? 'draft' : 'utkast') + ')</span>' : '')
       + '</div>'
       + '<div class="pr-meta">#' + pr.number + ' · '
-      +   (isEn ? 'by ' : 'fra ') + _prEsc(pr.author)
+      +   (isEn ? 'by ' : 'fra ')
+      +   '<span' + (pr.viaProxy
+            ? ' title="' + _prEsc(isEn
+                ? 'Submitted through the site on behalf of this user (technically created by ' + pr.botLogin + ')'
+                : 'Sendt inn via nettstedet på vegne av denne brukeren (teknisk opprettet av ' + pr.botLogin + ')')
+              + '" style="border-bottom:1px dotted #aab; cursor:help;"'
+            : '') + '>' + _prEsc(pr.author) + '</span>'
       +   ' · ' + _prEsc(_prAgo(pr.updatedAt)) + '</div>'
       + '<div class="pr-actions">'
       +   '<a class="pr-btn" href="' + _prEsc(pr.url) + '/files" target="_blank" rel="noopener"'
@@ -4204,7 +4224,7 @@ function _prConfirm(btn, repo, number, act) {
   btn.dataset.prArmed = '1';
   btn.dataset.prLabel = btn.textContent;
   btn.textContent = isEn ? 'Confirm' : 'Bekreft';
-  note.className = 'pr-note pr-note-ok';
+  note.className = 'pr-note pr-note-ask';
   note.style.display = 'block';
   note.textContent = act === 'merge'
     ? (isEn ? 'This includes the changes in the website and posts a thank-you comment to the contributor. Click "Confirm" to proceed.'
@@ -4216,10 +4236,13 @@ function _prConfirm(btn, repo, number, act) {
 function _prDisarmAll() {
   var btns = document.querySelectorAll('#pr-list [data-pr-act]');
   for (var i = 0; i < btns.length; i++) {
+    var r = btns[i].closest('.pr-row');
+    // Ferdigbehandlede rader skal BEHOLDE resultatteksten sin. Tidligere ble
+    // «Avslått, med kommentar» visket bort så snart man gikk løs på neste rad.
+    if (r && r.dataset.prDone === '1') continue;
     if (btns[i].dataset.prArmed === '1') {
       btns[i].dataset.prArmed = '0';
       if (btns[i].dataset.prLabel) btns[i].textContent = btns[i].dataset.prLabel;
-      var r = btns[i].closest('.pr-row');
       var n = r && r.querySelector('.pr-note');
       if (n) { n.style.display = 'none'; n.textContent = ''; }
     }
@@ -4250,11 +4273,16 @@ function _prExecute(row, btn, repo, number, act) {
     ).catch(function() { return null; });
   }).then(function() {
     note.className = 'pr-note pr-note-ok';
-    note.textContent = act === 'merge'
-      ? (isEn ? 'Merged. The website will rebuild shortly.'
-              : 'Slått sammen. Nettstedet bygges på nytt snart.')
-      : (isEn ? 'Declined and commented.' : 'Avslått, med kommentar.');
-    row.style.opacity = '.6';
+    // ✓ og «Ferdig:» gjør det tydelig at dette er et RESULTAT, ikke et spørsmål
+    note.textContent = '✓ ' + (isEn ? 'Done: ' : 'Ferdig: ') + (act === 'merge'
+      ? (isEn ? 'merged. The website will rebuild shortly.'
+              : 'slått sammen. Nettstedet bygges på nytt snart.')
+      : (isEn ? 'declined, with a comment to the contributor.'
+              : 'avslått, med kommentar til bidragsyteren.'));
+    row.dataset.prDone = '1';          // beskytt teksten mot _prDisarmAll
+    row.classList.add('pr-row-done');
+    // Skjul knappene – raden er ferdigbehandlet
+    for (var k = 0; k < allBtns.length; k++) allBtns[k].style.display = 'none';
     _prCache = null;   // tving ny henting neste gang
   }).catch(function(err) {
     note.className = 'pr-note pr-note-err';
