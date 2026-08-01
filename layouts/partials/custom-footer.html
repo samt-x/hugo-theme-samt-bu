@@ -3977,7 +3977,9 @@ function _prLoad(force) {
     return;
   }
 
-  listEl.innerHTML = '<div class="pr-empty">' + (isEn ? 'Loading…' : 'Laster…') + '</div>';
+  // Egen klasse på lastetilstanden: uten den er «Laster…» og «Ingen åpne forslag»
+  // samme element utenfra, og verken tester eller feilsøking kan skille dem.
+  listEl.innerHTML = '<div class="pr-empty pr-loading">' + (isEn ? 'Loading…' : 'Laster…') + '</div>';
   _prSetStatus('');
 
   samtuPrList().then(function(prs) {
