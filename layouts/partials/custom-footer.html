@@ -73,12 +73,17 @@ function storeToken(token) {
   try { sessionStorage.removeItem('samt-bu-prs-v1'); } catch(e) {}
 }
 
+/* loginHint: '*' → GitHubs egen kontovelger (prompt=select_account) – brukes av
+   «Bytt bruker» og pilen ved «Logg inn». Et brukernavn → login=<navn>-forslag
+   (beholdt, men gir bare et «suggested»-banner når en annen konto er aktiv). */
 function doGitHubLogin(onSuccess, loginHint) {
   var workerBase = 'https://auth.samt-bu.no';
   var force = !loginHint && localStorage.getItem('samt-bu-force-login') === '1';
   try { if (force || loginHint) localStorage.removeItem('samt-bu-force-login'); } catch(e) {}
   var authUrl = workerBase + '/auth?provider=github&site_id=samt-bu-docs' +
-    (loginHint ? '&login=' + encodeURIComponent(loginHint) : (force ? '&force=true' : ''));
+    (loginHint === '*' ? '&select=true'
+      : loginHint ? '&login=' + encodeURIComponent(loginHint)
+      : (force ? '&force=true' : ''));
   var w = 600, h = 700;
   var left = Math.round((screen.width - w) / 2);
   var top  = Math.round((screen.height - h) / 2);
@@ -362,13 +367,11 @@ function updateAvatarDisplay() {
   var avatar   = localStorage.getItem('samt-bu-gh-avatar');
   var login    = localStorage.getItem('samt-bu-gh-user');
   var caret = document.getElementById('samt-bu-login-caret');
-  var lmenu = document.getElementById('samt-bu-login-menu');
   if (avatar && login) {
     if (img)      { img.src = avatar; img.title = '@' + login; img.style.display = 'inline-block'; }
     if (label)    { label.textContent = '@' + login; }
     if (loginBtn) { loginBtn.style.display = 'none'; }
     if (caret)    { caret.style.display = 'none'; }
-    if (lmenu)    { lmenu.style.display = 'none'; }
     samtbuUpdateMenuLabels();
   } else {
     if (img)      { img.style.display = 'none'; }
@@ -1207,60 +1210,16 @@ setTimeout(function() {
     });
   }
 
-  /* Pil ved «Logg inn»: logg inn som navngitt bruker fra UTLOGGET tilstand.
-     «Bytt bruker» i avatar-menyen finnes bare når man er innlogget – uten
-     denne har en utlogget bruker ingen måte å velge konto på (funnet 2026-08-01). */
+  /* Pil ved «Logg inn»: kontovelger fra UTLOGGET tilstand. «Bytt bruker» ligger
+     i avatar-menyen og finnes bare innlogget – uten pilen har en utlogget
+     bruker ingen måte å velge konto på (funnet 2026-08-01). */
   var loginCaret = document.getElementById('samt-bu-login-caret');
-  var loginMenu  = document.getElementById('samt-bu-login-menu');
-  var loginInput = document.getElementById('samt-bu-login-input');
-  var loginGo    = document.getElementById('samt-bu-login-go');
-  var loginMsg   = document.getElementById('samt-bu-login-msg');
-
-  function closeLoginMenu() {
-    if (loginMenu) loginMenu.style.display = 'none';
-    if (loginMsg)  loginMsg.style.display  = 'none';
-  }
-
-  function doLoginAs() {
-    var username = loginInput ? loginInput.value.trim().replace(/^@/, '') : '';
-    if (!username) { if (loginInput) loginInput.focus(); return; }
-    if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(username)) {
-      if (loginMsg) {
-        loginMsg.textContent = (window._samtbuThisPage && window._samtbuThisPage.lang === 'en')
-          ? 'Not a valid GitHub username.' : 'Ikke et gyldig GitHub-brukernavn.';
-        loginMsg.style.display = 'block';
-      }
-      return;
-    }
-    closeLoginMenu();
-    doGitHubLogin(function() { fetchCurrentUser(function() {}); }, username);
-  }
-
   if (loginCaret) {
     loginCaret.addEventListener('click', function(e) {
       e.preventDefault();
-      e.stopPropagation();
-      var open = loginMenu && loginMenu.style.display !== 'none' && loginMenu.style.display !== '';
-      if (open) { closeLoginMenu(); return; }
-      if (loginMenu)  loginMenu.style.display = 'block';
-      if (loginInput) { loginInput.value = ''; loginInput.focus(); }
+      doGitHubLogin(function() { fetchCurrentUser(function() {}); }, '*');
     });
   }
-  if (loginMenu) {
-    loginMenu.addEventListener('click', function(e) { e.stopPropagation(); });
-  }
-  if (loginGo) {
-    loginGo.addEventListener('click', function(e) {
-      e.preventDefault(); e.stopPropagation(); doLoginAs();
-    });
-  }
-  if (loginInput) {
-    loginInput.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter')  { e.preventDefault(); doLoginAs(); }
-      if (e.key === 'Escape') { e.preventDefault(); closeLoginMenu(); }
-    });
-  }
-  document.addEventListener('click', closeLoginMenu);
 
   if (!img || !menu) return;
 
@@ -1268,7 +1227,6 @@ setTimeout(function() {
     e.stopPropagation();
     var isOpen = menu.style.display !== 'none';
     menu.style.display = isOpen ? 'none' : 'block';
-    closeSwitchForm();   // menyen skal alltid åpne på lenken, ikke midt i skjemaet
     // Lukk andre menyer
     ['edit-menu','lang-menu','tema-menu'].forEach(function(id) {
       var el = document.getElementById(id);
@@ -1276,70 +1234,17 @@ setTimeout(function() {
     });
   });
 
-  /* Bytt bruker krever brukernavn.
-     GitHub bytter ikke konto av seg selv: har du en aktiv sesjon på github.com
-     og appen er godkjent fra før, sender authorize-URL-en deg rett tilbake som
-     samme bruker. Heller ikke force=true hjelper – den ruter via
-     github.com/login, som bare viser skjemaet hvis du er utlogget.
-     login=<brukernavn> er den dokumenterte måten å be om en bestemt konto, og
-     workeren videresender den i handleAuth. */
-  var switchFormRow = document.getElementById('samt-bu-switch-form-row');
-  var switchRow     = document.getElementById('samt-bu-switch-row');
-  var switchInput   = document.getElementById('samt-bu-switch-input');
-  var switchConfirm = document.getElementById('samt-bu-switch-confirm');
-  var switchMsg     = document.getElementById('samt-bu-switch-msg');
-
-  function closeSwitchForm() {
-    if (switchFormRow) switchFormRow.style.display = 'none';
-    if (switchRow)     switchRow.style.display     = 'block';
-    if (switchMsg)     switchMsg.style.display     = 'none';
-  }
-
-  function doSwitchUser() {
-    var username = switchInput ? switchInput.value.trim().replace(/^@/, '') : '';
-    if (!username) {
-      if (switchInput) switchInput.focus();
-      return;
-    }
-    // GitHub-brukernavn: bokstaver, tall og bindestrek
-    if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(username)) {
-      if (switchMsg) {
-        switchMsg.textContent = (window._samtbuThisPage && window._samtbuThisPage.lang === 'en')
-          ? 'Not a valid GitHub username.' : 'Ikke et gyldig GitHub-brukernavn.';
-        switchMsg.style.display = 'block';
-      }
-      return;
-    }
-    menu.style.display = 'none';
-    closeSwitchForm();
-    samtbuLogout();
-    doGitHubLogin(function() { fetchCurrentUser(function() {}); }, username);
-  }
-
+  /* «Bytt bruker» = GitHubs egen kontovelger (prompt=select_account via '*').
+     GitHub bytter aldri konto av seg selv med aktiv sesjon, og login=<navn> ga
+     bare et «suggested»-banner med feil konto som standard (2026-08-01).
+     Kontovelgeren er nøytral: velg blant innloggede kontoer eller legg til ny –
+     ingen skriving av brukernavn nødvendig. */
   if (switchBtn) {
     switchBtn.addEventListener('click', function(e) {
       e.preventDefault();
-      e.stopPropagation();
-      if (switchFormRow) switchFormRow.style.display = 'block';
-      if (switchRow)     switchRow.style.display     = 'none';
-      if (switchMsg)     switchMsg.style.display     = 'none';
-      if (switchInput)   { switchInput.value = ''; switchInput.focus(); }
-    });
-  }
-
-  // Klikk inne i skjemaet må ikke boble opp til document-handleren som lukker menyen
-  if (switchFormRow) {
-    switchFormRow.addEventListener('click', function(e) { e.stopPropagation(); });
-  }
-  if (switchConfirm) {
-    switchConfirm.addEventListener('click', function(e) {
-      e.preventDefault(); e.stopPropagation(); doSwitchUser();
-    });
-  }
-  if (switchInput) {
-    switchInput.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter')  { e.preventDefault(); doSwitchUser(); }
-      if (e.key === 'Escape') { e.preventDefault(); closeSwitchForm(); }
+      menu.style.display = 'none';
+      samtbuLogout();
+      doGitHubLogin(function() { fetchCurrentUser(function() {}); }, '*');
     });
   }
 
@@ -1347,7 +1252,6 @@ setTimeout(function() {
     logoutBtn.addEventListener('click', function(e) {
       e.preventDefault();
       menu.style.display = 'none';
-      closeSwitchForm();
       samtbuLogout();
       // Forklar at GitHub-sesjonen består – ellers ser utloggingen ut som en feil
       samtbuLogoutNotice();
@@ -1356,7 +1260,6 @@ setTimeout(function() {
 
   document.addEventListener('click', function() {
     if (menu) menu.style.display = 'none';
-    closeSwitchForm();   // neste åpning skal starte på lenken, ikke i skjemaet
   });
 })();
 </script>
