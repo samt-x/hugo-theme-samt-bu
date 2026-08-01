@@ -290,14 +290,14 @@ function samtbuLogoutNotice() {
   var p = document.createElement('p');
   p.style.cssText = 'margin:0 0 .7rem;';
   p.textContent = en
-    ? 'Logged out. Access has been revoked, so signing in again requires approval.'
-    : 'Du er logget ut. Tilgangen er trukket tilbake, så neste innlogging må godkjennes på nytt.';
+    ? 'Logged out.'
+    : 'Du er logget ut.';
 
   var p2 = document.createElement('p');
   p2.style.cssText = 'margin:0 0 .7rem; font-size:13px; color:#667;';
   p2.textContent = en
-    ? 'Your GitHub session in this browser is untouched. Sign out of GitHub too if you want to use a different account.'
-    : 'GitHub-sesjonen i nettleseren er urørt. Logg ut av GitHub også hvis du vil bruke en annen konto.';
+    ? 'Signing in again reconnects to the same GitHub account. To use a different account, choose “Switch user” in the menu – or sign out of GitHub too.'
+    : 'Neste innlogging kobler automatisk til samme GitHub-konto. Vil du bruke en annen konto, velg «Bytt bruker» i menyen – eller logg ut av GitHub også.';
 
   var row = document.createElement('div');
   row.style.cssText = 'display:flex; gap:.6rem; justify-content:flex-end; align-items:center;';
@@ -324,10 +324,12 @@ function samtbuLogoutNotice() {
   box.appendChild(row);
   document.body.appendChild(box);
 
+  // Kort nok til at meldingen ikke oppleves som en ventetilstand –
+  // 20 sek ble tolket som at utloggingen «hang» (2026-08-01)
   setTimeout(function() {
     var el = document.getElementById('samt-bu-logout-notice');
     if (el) el.remove();
-  }, 20000);
+  }, 10000);
 }
 
 // Hent og cache innlogget GitHub-brukernavn
