@@ -188,7 +188,9 @@
     {{/* Brukernavnet må oppgis: GitHub bytter ikke konto av seg selv når du
          allerede har en aktiv sesjon der. Navnet sendes som login=<navn> på
          authorize-URL-en, som er den dokumenterte måten å be om en bestemt konto. */}}
-    <li id="samt-bu-switch-form-row" style="display:none; padding:9px 14px 11px; border-top:1px solid #eee;">
+    {{/* line-height må settes eksplisitt: #samt-bu-avatar-wrap har line-height:0,
+         som arves hit og kollapser tekstlinjer uten egen padding til null høyde. */}}
+    <li id="samt-bu-switch-form-row" style="display:none; padding:9px 14px 11px; border-top:1px solid #eee; line-height:1.4;">
       <label for="samt-bu-switch-input" style="display:block; font-size:11px; font-weight:600; color:#667; text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px;">{{ cond (eq $lang "en") "Switch to" "Bytt til" }}</label>
       <div style="display:flex; gap:5px; align-items:center;">
         <input id="samt-bu-switch-input" type="text" placeholder="{{ cond (eq $lang "en") "GitHub username" "GitHub-brukernavn" }}" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1; font-size:13px; padding:5px 7px; border:1px solid #ccc; border-radius:3px; outline:none; min-width:0; font-family:inherit;">
