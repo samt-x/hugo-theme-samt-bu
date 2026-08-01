@@ -184,7 +184,18 @@
   </style>
   <ul id="samt-bu-avatar-menu" style="display:none; position:absolute; right:0; top:34px; background:#fff; border:1px solid #ddd; border-radius:6px; box-shadow:0 4px 18px rgba(0,0,0,.18); min-width:200px; padding:0; z-index:99999; list-style:none; margin:0; overflow:hidden;">
     <li id="samt-bu-avatar-username" style="padding:12px 16px; font-size:14px; font-weight:600; color:#333; background:#f5f7fa; border-bottom:2px solid #dde3ec; white-space:nowrap;"></li>
-    <li><a href="#" id="samt-bu-switch-btn" style="display:block; padding:11px 16px; font-size:14px; text-decoration:none;">{{ cond (eq $lang "en") "Switch user" "Bytt bruker" }}</a></li>
+    <li id="samt-bu-switch-row"><a href="#" id="samt-bu-switch-btn" style="display:block; padding:11px 16px; font-size:14px; text-decoration:none;">{{ cond (eq $lang "en") "Switch user" "Bytt bruker" }}</a></li>
+    {{/* Brukernavnet må oppgis: GitHub bytter ikke konto av seg selv når du
+         allerede har en aktiv sesjon der. Navnet sendes som login=<navn> på
+         authorize-URL-en, som er den dokumenterte måten å be om en bestemt konto. */}}
+    <li id="samt-bu-switch-form-row" style="display:none; padding:9px 14px 11px; border-top:1px solid #eee;">
+      <label for="samt-bu-switch-input" style="display:block; font-size:11px; font-weight:600; color:#667; text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px;">{{ cond (eq $lang "en") "Switch to" "Bytt til" }}</label>
+      <div style="display:flex; gap:5px; align-items:center;">
+        <input id="samt-bu-switch-input" type="text" placeholder="{{ cond (eq $lang "en") "GitHub username" "GitHub-brukernavn" }}" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1; font-size:13px; padding:5px 7px; border:1px solid #ccc; border-radius:3px; outline:none; min-width:0; font-family:inherit;">
+        <button id="samt-bu-switch-confirm" type="button" style="font-size:13px; padding:5px 11px; border:1px solid #1a4a8a; border-radius:3px; background:#1a4a8a; color:#fff; cursor:pointer; font-family:inherit;">→</button>
+      </div>
+      <div id="samt-bu-switch-msg" style="display:none; margin-top:5px; font-size:12px; color:#b00020;"></div>
+    </li>
     <li style="border-top:1px solid #eee;"><a href="#" id="samt-bu-logout-btn" style="display:block; padding:11px 16px; font-size:14px; text-decoration:none;">{{ cond (eq $lang "en") "Log out" "Logg ut" }}</a></li>
   </ul>
 </div>

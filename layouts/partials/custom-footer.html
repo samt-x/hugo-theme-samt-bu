@@ -1121,6 +1121,7 @@ setTimeout(function() {
     e.stopPropagation();
     var isOpen = menu.style.display !== 'none';
     menu.style.display = isOpen ? 'none' : 'block';
+    closeSwitchForm();   // menyen skal alltid åpne på lenken, ikke midt i skjemaet
     // Lukk andre menyer
     ['edit-menu','lang-menu','tema-menu'].forEach(function(id) {
       var el = document.getElementById(id);
@@ -1128,13 +1129,70 @@ setTimeout(function() {
     });
   });
 
+  /* Bytt bruker krever brukernavn.
+     GitHub bytter ikke konto av seg selv: har du en aktiv sesjon på github.com
+     og appen er godkjent fra før, sender authorize-URL-en deg rett tilbake som
+     samme bruker. Heller ikke force=true hjelper – den ruter via
+     github.com/login, som bare viser skjemaet hvis du er utlogget.
+     login=<brukernavn> er den dokumenterte måten å be om en bestemt konto, og
+     workeren videresender den i handleAuth. */
+  var switchFormRow = document.getElementById('samt-bu-switch-form-row');
+  var switchRow     = document.getElementById('samt-bu-switch-row');
+  var switchInput   = document.getElementById('samt-bu-switch-input');
+  var switchConfirm = document.getElementById('samt-bu-switch-confirm');
+  var switchMsg     = document.getElementById('samt-bu-switch-msg');
+
+  function closeSwitchForm() {
+    if (switchFormRow) switchFormRow.style.display = 'none';
+    if (switchRow)     switchRow.style.display     = 'block';
+    if (switchMsg)     switchMsg.style.display     = 'none';
+  }
+
+  function doSwitchUser() {
+    var username = switchInput ? switchInput.value.trim().replace(/^@/, '') : '';
+    if (!username) {
+      if (switchInput) switchInput.focus();
+      return;
+    }
+    // GitHub-brukernavn: bokstaver, tall og bindestrek
+    if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(username)) {
+      if (switchMsg) {
+        switchMsg.textContent = (window._samtbuThisPage && window._samtbuThisPage.lang === 'en')
+          ? 'Not a valid GitHub username.' : 'Ikke et gyldig GitHub-brukernavn.';
+        switchMsg.style.display = 'block';
+      }
+      return;
+    }
+    menu.style.display = 'none';
+    closeSwitchForm();
+    samtbuLogout();
+    doGitHubLogin(function() { fetchCurrentUser(function() {}); }, username);
+  }
+
   if (switchBtn) {
     switchBtn.addEventListener('click', function(e) {
       e.preventDefault();
-      menu.style.display = 'none';
-      samtbuLogout();
-      try { localStorage.removeItem('samt-bu-force-login'); } catch(ex) {}
-      doGitHubLogin(function() { fetchCurrentUser(function() {}); });
+      e.stopPropagation();
+      if (switchFormRow) switchFormRow.style.display = 'block';
+      if (switchRow)     switchRow.style.display     = 'none';
+      if (switchMsg)     switchMsg.style.display     = 'none';
+      if (switchInput)   { switchInput.value = ''; switchInput.focus(); }
+    });
+  }
+
+  // Klikk inne i skjemaet må ikke boble opp til document-handleren som lukker menyen
+  if (switchFormRow) {
+    switchFormRow.addEventListener('click', function(e) { e.stopPropagation(); });
+  }
+  if (switchConfirm) {
+    switchConfirm.addEventListener('click', function(e) {
+      e.preventDefault(); e.stopPropagation(); doSwitchUser();
+    });
+  }
+  if (switchInput) {
+    switchInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter')  { e.preventDefault(); doSwitchUser(); }
+      if (e.key === 'Escape') { e.preventDefault(); closeSwitchForm(); }
     });
   }
 
@@ -1148,6 +1206,7 @@ setTimeout(function() {
 
   document.addEventListener('click', function() {
     if (menu) menu.style.display = 'none';
+    closeSwitchForm();   // neste åpning skal starte på lenken, ikke i skjemaet
   });
 })();
 </script>
