@@ -4082,18 +4082,27 @@ function _prSetStatus(msg) {
   if (el) el.textContent = msg || '';
 }
 
-// Standardmelding etter merge. Bevisst uten tidsestimat («snart», ikke «om ett
-// minutt») – se feedback om PR-akseptmeldinger.
-function _prMergeComment() {
-  return _prIsEn()
-    ? 'Thank you – your suggestion has been approved and included. The website will be updated shortly.'
-    : 'Takk for forslaget! Det er godkjent og tatt inn. Nettstedet oppdateres snart.';
+/* @-omtale av forslagsstilleren er ikke en høflighetsfrase – det er den ENESTE
+   varslingen vedkommende får. Forslag sendt via workeren har samt-x-bot som
+   PR-forfatter, så den ekte personen er verken forfatter, deltaker eller
+   abonnent, og GitHub varsler dem ikke om at forslaget er behandlet.
+   En @-omtale utløser varsel. Uten den svarer vi i en tråd ingen leser. */
+function _prMention(author) {
+  return (author && author !== 'samt-x-bot') ? '@' + author + ' ' : '';
 }
 
-function _prCloseComment() {
-  return _prIsEn()
-    ? 'Thank you for the suggestion. We are not taking this one forward, but the input is appreciated and noted.'
-    : 'Takk for forslaget. Vi tar det ikke videre denne gangen, men innspillet er notert og satt pris på.';
+// Bevisst uten tidsestimat («snart», ikke «om ett minutt») – se feedback om
+// PR-akseptmeldinger.
+function _prMergeComment(author) {
+  return _prMention(author) + (_prIsEn()
+    ? '– thank you! Your suggestion has been approved and included. The website will be updated shortly.'
+    : '– takk for forslaget! Det er godkjent og tatt inn. Nettstedet oppdateres snart.');
+}
+
+function _prCloseComment(author) {
+  return _prMention(author) + (_prIsEn()
+    ? '– thank you for the suggestion. We are not taking this one forward, but the input is appreciated and noted.'
+    : '– takk for forslaget. Vi tar det ikke videre denne gangen, men innspillet er notert og satt pris på.');
 }
 
 function openPrDialog(lang) {
@@ -4170,7 +4179,8 @@ function _prRender(prs) {
   prs.forEach(function(pr) {
     var canWrite = !!_prPerm[pr.repo];
     var rowId = 'pr-row-' + pr.repo + '-' + pr.number;
-    html += '<div class="pr-row" id="' + _prEsc(rowId) + '">'
+    html += '<div class="pr-row" id="' + _prEsc(rowId) + '"'
+      + ' data-pr-author="' + _prEsc(pr.author) + '">'
       + '<div>'
       +   '<span class="pr-repo">' + _prEsc(pr.repo) + '</span>'
       +   '<a class="pr-title" href="' + _prEsc(pr.url) + '" target="_blank" rel="noopener">'
@@ -4268,8 +4278,9 @@ function _prExecute(row, btn, repo, number, act) {
   op.then(function() {
     // Kommentaren er en høflighet, ikke en forutsetning – en feil her skal ikke
     // få handlingen til å se mislykket ut.
+    var author = row.dataset.prAuthor || '';
     return samtbuPrComment(repo, number,
-      act === 'merge' ? _prMergeComment() : _prCloseComment()
+      act === 'merge' ? _prMergeComment(author) : _prCloseComment(author)
     ).catch(function() { return null; });
   }).then(function() {
     note.className = 'pr-note pr-note-ok';
