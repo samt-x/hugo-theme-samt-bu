@@ -135,6 +135,11 @@
                   {{ $repo = "samt-bu-pilot-4" }}
                 {{ else if or (eq $dir "arkitektur/informasjonsarkitektur") (hasPrefix $dir "arkitektur/informasjonsarkitektur/") }}
                   {{ $repo = "team-semantics" }}
+                {{ else if or (eq $dir "ekstern-markedsdialog") (hasPrefix $dir "ekstern-markedsdialog/") }}
+                  {{/* Manglet her da modulen ble lagt til – alle sider under
+                       /ekstern-markedsdialog/ pekte på samt-bu-docs. Funnet
+                       2026-08-02 ved test av innspill fra ekstern bruker. */}}
+                  {{ $repo = "samt-bu-market-engagement" }}
                 {{ end }}
                 <span class="page-meta-repo"><a href="https://github.com/SAMT-X/{{ $repo }}" target="_blank" rel="noopener">SAMT-X/{{ $repo }}</a></span>
               {{ end }}
