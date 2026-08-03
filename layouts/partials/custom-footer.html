@@ -594,6 +594,110 @@ function samtbuPrComment(repo, number, body) {
   });
 }
 
+/* ---------------------------------------------------------------------------
+   Forsinket takk til forslagsstilleren
+
+   VERIFISERT 2026-08-03 på PR #111 i samt-bu-docs:
+   - Merge-varsel går KUN til dem som var abonnenter idet mergen skjedde.
+     `githagen` var det ikke, og fikk ingenting på 58 minutter.
+   - En @-omtale i ettertid melder deg på tråden FRAMOVER, men drar IKKE med
+     seg det som allerede har skjedd. Kommentaren ga én e-post, ikke to.
+
+   Legges takken ut umiddelbart etter mergen (ett sekunds mellomrom, som før),
+   rekker ikke GitHubs utsending å bli ferdig, og forslagsstilleren får to
+   e-poster: «Merged #N into main.» og kommentaren. Ventes det litt, blir det
+   bare den ene som faktisk sier noe.
+
+   Terskelen er ikke målt. 120 sekunder er romslig valgt, og feilmåten er
+   godartet: bommer vi for kort, blir resultatet to e-poster – altså dagens
+   tilstand. Ingen bidragsyter mister noe. Er tallet for lavt, hev det her.
+
+   Køen ligger i localStorage slik at en lukket fane ikke spiser takken; samme
+   mønster som pending build-indikatoren. Ved sidelast tas forfalte elementer.
+--------------------------------------------------------------------------- */
+var SAMTBU_THANKS_DELAY_MS = 120000;
+var SAMTBU_THANKS_KEY = 'samt-bu-pending-thanks';
+var SAMTBU_THANKS_MAX_TRIES = 5;
+var _samtbuThanksTimer = null;
+
+function samtbuThanksRead() {
+  try { return JSON.parse(localStorage.getItem(SAMTBU_THANKS_KEY)) || []; }
+  catch (e) { return []; }
+}
+function samtbuThanksWrite(list) {
+  try { localStorage.setItem(SAMTBU_THANKS_KEY, JSON.stringify(list)); } catch (e) {}
+}
+function samtbuThanksId(item) { return item.repo + '#' + item.number; }
+
+// Køen leses på nytt ved hver endring – en annen fane kan ha rørt den.
+function samtbuThanksDrop(id) {
+  samtbuThanksWrite(samtbuThanksRead().filter(function(x) {
+    return samtbuThanksId(x) !== id;
+  }));
+}
+function samtbuThanksPatch(id, changes) {
+  var list = samtbuThanksRead();
+  for (var i = 0; i < list.length; i++) {
+    if (samtbuThanksId(list[i]) !== id) continue;
+    for (var k in changes) {
+      if (Object.prototype.hasOwnProperty.call(changes, k)) list[i][k] = changes[k];
+    }
+  }
+  samtbuThanksWrite(list);
+}
+
+function samtbuQueueThanks(repo, number, body) {
+  var id = repo + '#' + number;
+  var list = samtbuThanksRead();
+  for (var i = 0; i < list.length; i++) {
+    if (samtbuThanksId(list[i]) === id) return;   // allerede i kø
+  }
+  list.push({
+    repo: repo, number: number, body: body,
+    dueAt: Date.now() + SAMTBU_THANKS_DELAY_MS, tries: 0, postingAt: 0
+  });
+  samtbuThanksWrite(list);
+  samtbuScheduleThanks();
+}
+
+function samtbuScheduleThanks() {
+  if (_samtbuThanksTimer) { clearTimeout(_samtbuThanksTimer); _samtbuThanksTimer = null; }
+  var list = samtbuThanksRead();
+  if (!list.length) return;
+  var next = Infinity;
+  for (var i = 0; i < list.length; i++) next = Math.min(next, list[i].dueAt);
+  // +250 ms slik at dueAt garantert er passert når vi våkner
+  _samtbuThanksTimer = setTimeout(samtbuFlushThanks, Math.max(0, next - Date.now()) + 250);
+}
+
+function samtbuFlushThanks() {
+  // Uten token kan vi ikke poste. Køen blir stående til neste innlogging –
+  // bedre en forsinket takk enn ingen.
+  if (!getStoredToken()) return;
+  var now = Date.now();
+  samtbuThanksRead().forEach(function(item) {
+    if (item.dueAt > now) return;
+    // En annen fane kan være i gang. Gi den et minutt før vi prøver selv.
+    if (item.postingAt && (now - item.postingAt) < 60000) return;
+    var id = samtbuThanksId(item);
+    var tries = (item.tries || 0) + 1;
+    samtbuThanksPatch(id, { postingAt: now, tries: tries });
+    samtbuPrComment(item.repo, item.number, item.body)
+      .then(function() { samtbuThanksDrop(id); })
+      .catch(function(err) {
+        var status = err && err.status;
+        // 4xx = PR-en er borte eller vi mangler rettighet. Nytteløst å gjenta.
+        // Nettverksfeil skal derimot få nye forsøk ved neste sidelast.
+        if ((status >= 400 && status < 500) || tries >= SAMTBU_THANKS_MAX_TRIES) {
+          samtbuThanksDrop(id);
+        } else {
+          samtbuThanksPatch(id, { postingAt: 0 });
+        }
+      })
+      .then(samtbuScheduleThanks);
+  });
+}
+
 // Promise-innpakning av den callback-baserte rettighetssjekken.
 function samtbuCanWrite(repo) {
   return new Promise(function(resolve) {
@@ -1043,6 +1147,10 @@ function loadTiptap(callback) {
 // Pre-hent GitHub-brukernavn hvis innlogget (popuperer cache for bruk ved lagring)
 if (getStoredToken() && (!localStorage.getItem('samt-bu-gh-user') || !localStorage.getItem('samt-bu-gh-avatar'))) fetchCurrentUser(function() {});
 updateAvatarDisplay();
+
+// Ta opp igjen køen av forsinkede takkemeldinger. Er noe forfalt mens fanen var
+// lukket, postes det nå; ellers settes en timer. Se samtbuQueueThanks.
+samtbuScheduleThanks();
 
 // Gjenopprett pending-spinner ved sideinnlasting og tell ned per ferdig bygg
 setTimeout(function() {
@@ -4325,10 +4433,10 @@ function _prConfirm(btn, repo, number, act) {
   note.className = 'pr-note pr-note-ask';
   note.style.display = 'block';
   note.textContent = act === 'merge'
-    ? (isEn ? 'This includes the changes in the website and posts a thank-you comment to the contributor. Click "Confirm" to proceed.'
-            : 'Dette tar endringene inn i nettstedet og legger igjen en takkekommentar til bidragsyteren. Klikk «Bekreft» for å fullføre.')
-    : (isEn ? 'This declines the suggestion and posts a friendly comment. Nothing is deleted – it can be reopened in GitHub. Click "Confirm" to proceed.'
-            : 'Dette avslår forslaget og legger igjen en vennlig kommentar. Ingenting slettes – det kan gjenåpnes i GitHub. Klikk «Bekreft» for å fullføre.');
+    ? (isEn ? 'This includes the changes in the website. The thank-you to the contributor is posted a couple of minutes later. Click "Confirm" to proceed.'
+            : 'Dette tar endringene inn i nettstedet. Takken til bidragsyteren legges ut et par minutter senere. Klikk «Bekreft» for å fullføre.')
+    : (isEn ? 'This declines the suggestion. A friendly comment is posted a couple of minutes later. Nothing is deleted – it can be reopened in GitHub. Click "Confirm" to proceed.'
+            : 'Dette avslår forslaget. En vennlig kommentar legges ut et par minutter senere. Ingenting slettes – det kan gjenåpnes i GitHub. Klikk «Bekreft» for å fullføre.');
 }
 
 function _prDisarmAll() {
@@ -4374,19 +4482,20 @@ function _prExecute(row, btn, repo, number, act) {
     });
 
   op.then(function() {
-    // Kommentaren er en høflighet, ikke en forutsetning – en feil her skal ikke
-    // få handlingen til å se mislykket ut.
-    return samtbuPrComment(repo, number,
-      act === 'merge' ? _prMergeComment(author) : _prCloseComment(author)
-    ).catch(function() { return null; });
+    // Takken KØES med forsinkelse i stedet for å postes nå – se
+    // samtbuQueueThanks. Legges den ut umiddelbart, får bidragsyteren to
+    // e-poster i stedet for én.
+    samtbuQueueThanks(repo, number,
+      act === 'merge' ? _prMergeComment(author) : _prCloseComment(author));
+    return null;
   }).then(function() {
     note.className = 'pr-note pr-note-ok';
     // ✓ og «Ferdig:» gjør det tydelig at dette er et RESULTAT, ikke et spørsmål
     note.textContent = '✓ ' + (isEn ? 'Done: ' : 'Ferdig: ') + (act === 'merge'
-      ? (isEn ? 'merged. The website will rebuild shortly.'
-              : 'slått sammen. Nettstedet bygges på nytt snart.')
-      : (isEn ? 'declined, with a comment to the contributor.'
-              : 'avslått, med kommentar til bidragsyteren.'));
+      ? (isEn ? 'merged. The website will rebuild shortly. The thank-you is sent in a couple of minutes.'
+              : 'slått sammen. Nettstedet bygges på nytt snart. Takken sendes om et par minutter.')
+      : (isEn ? 'declined. The contributor is notified in a couple of minutes.'
+              : 'avslått. Beskjed til bidragsyteren sendes om et par minutter.'));
     row.dataset.prDone = '1';          // beskytt teksten mot _prDisarmAll
     row.classList.add('pr-row-done');
     // Skjul knappene – raden er ferdigbehandlet
