@@ -549,18 +549,16 @@ function samtbuPrList() {
 // Slå sammen. merge_method 'merge' er bevisst: gir «Merged» (lilla) i GitHub,
 // ikke «Closed» – som er forvirrende for ikke-tekniske bidragsytere.
 //
-// commitMessage bærer takken til bidragsyteren, inkludert @-omtalen. Den lå
-// tidligere i en egen PR-kommentar lagt ut rett etter mergen, og da ble det TO
-// e-poster: én for merge-hendelsen og én for kommentaren. Ved å legge meldingen
-// i selve merge-committen finnes det bare én hendelse å varsle om.
-function samtbuPrMerge(repo, number, commitTitle, commitMessage) {
+// ⚠ commit_message er BEVISST ikke i bruk. Forsøkt 2026-08-03: takken ble lagt
+// i merge-committens melding, med @-omtale, for å slippe unna med én hendelse i
+// stedet for to. Committen ble riktig bygget (se 6078bdac), men GitHub sender
+// INGEN e-post for @-omtale i en commit-melding. Testet to ganger med githagen –
+// null varsel. Takken ligger derfor i en PR-kommentar igjen. Ikke prøv på nytt
+// uten å teste med en ekte mottakerkonto først: feilen er helt stille.
+function samtbuPrMerge(repo, number, commitTitle) {
   return samtbuGh('/repos/' + SAMTBU_ORG + '/' + repo + '/pulls/' + number + '/merge', {
     method: 'PUT',
-    body: {
-      merge_method: 'merge',
-      commit_title: commitTitle || undefined,
-      commit_message: commitMessage || undefined
-    }
+    body: { merge_method: 'merge', commit_title: commitTitle || undefined }
   });
 }
 
@@ -4308,8 +4306,8 @@ function _prConfirm(btn, repo, number, act) {
   note.className = 'pr-note pr-note-ask';
   note.style.display = 'block';
   note.textContent = act === 'merge'
-    ? (isEn ? 'This includes the changes in the website and sends a thank-you to the contributor. Click "Confirm" to proceed.'
-            : 'Dette tar endringene inn i nettstedet og sender en takk til bidragsyteren. Klikk «Bekreft» for å fullføre.')
+    ? (isEn ? 'This includes the changes in the website and posts a thank-you comment to the contributor. Click "Confirm" to proceed.'
+            : 'Dette tar endringene inn i nettstedet og legger igjen en takkekommentar til bidragsyteren. Klikk «Bekreft» for å fullføre.')
     : (isEn ? 'This declines the suggestion and posts a friendly comment. Nothing is deleted – it can be reopened in GitHub. Click "Confirm" to proceed.'
             : 'Dette avslår forslaget og legger igjen en vennlig kommentar. Ingenting slettes – det kan gjenåpnes i GitHub. Klikk «Bekreft» for å fullføre.');
 }
@@ -4352,19 +4350,16 @@ function _prExecute(row, btn, repo, number, act) {
       : Promise.resolve())
     .then(function() {
       return act === 'merge'
-        // Takken ligger i merge-committen, ikke i en egen kommentar: to
-        // hendelser i samme tråd ga to e-poster til bidragsyteren.
-        ? samtbuPrMerge(repo, number, newTitle, _prMergeComment(author))
+        ? samtbuPrMerge(repo, number, newTitle)
         : samtbuPrClose(repo, number);
     });
 
   op.then(function() {
-    // Avslag har ingen commit å legge meldingen i, så der trengs kommentaren
-    // fortsatt. Den er en høflighet, ikke en forutsetning – en feil her skal
-    // ikke få handlingen til å se mislykket ut.
-    if (act === 'merge') return null;
-    return samtbuPrComment(repo, number, _prCloseComment(author))
-      .catch(function() { return null; });
+    // Kommentaren er en høflighet, ikke en forutsetning – en feil her skal ikke
+    // få handlingen til å se mislykket ut.
+    return samtbuPrComment(repo, number,
+      act === 'merge' ? _prMergeComment(author) : _prCloseComment(author)
+    ).catch(function() { return null; });
   }).then(function() {
     note.className = 'pr-note pr-note-ok';
     // ✓ og «Ferdig:» gjør det tydelig at dette er et RESULTAT, ikke et spørsmål
