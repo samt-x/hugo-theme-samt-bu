@@ -389,12 +389,17 @@ function samtbuUpdateMenuLabels() {
     if (moveLabel) moveLabel.textContent = canWrite ? (lang === 'en' ? 'Move this chapter' : 'Flytt dette kapitlet') : (lang === 'en' ? 'Suggest moving this chapter' : 'Foreslå flytting av kapittel');
   });
 }
+/* Utlogget = «Foreslå…», ikke «Rediger…». Vi kan ikke vite om en utlogget
+   besøkende har skrivetilgang, og de aller fleste har det ikke. Å love
+   redigering vi kanskje ikke kan innfri er verre enn å tilby forslag til en
+   som viser seg å ha mer. Klikket fører til innlogging i begge tilfeller, og
+   samtbuUpdateMenuLabels() retter etiketten straks rettigheten er kjent. */
 function samtbuResetMenuLabels() {
   var lang = window._samtbuThisPage ? window._samtbuThisPage.lang : 'nb';
   var editLabel = document.getElementById('samt-bu-edit-page-label');
   var moveLabel = document.getElementById('samt-bu-move-label');
-  if (editLabel) editLabel.textContent = lang === 'en' ? 'Edit this page' : 'Rediger denne siden';
-  if (moveLabel) moveLabel.textContent = lang === 'en' ? 'Move this chapter' : 'Flytt dette kapitlet';
+  if (editLabel) editLabel.textContent = lang === 'en' ? 'Suggest edit to this page' : 'Foreslå endring av denne siden';
+  if (moveLabel) moveLabel.textContent = lang === 'en' ? 'Suggest moving this chapter' : 'Foreslå flytting av kapittel';
 }
 
 /* IKKE I BRUK ved utlogging – behold som verktøy, men les hvorfor:
@@ -1196,6 +1201,16 @@ setTimeout(function() {
         menu.querySelectorAll('li a span').forEach(function(span) {
           if (span.dataset.orig) span.textContent = span.dataset.orig;
         });
+        /* #samt-bu-edit-page-label og #samt-bu-move-label styres av id, ikke av
+           tekstmatchingen under, og sto derfor igjen med det nullstillingen
+           satte. Hva dataset.orig fanget opp avgjøres av et kappløp ved
+           sidelast: er tillatelsescachen varm, svarer checkCollaboratorPermission
+           synkront og øyeblikksbildet fanger «Foreslå…»; er den kald, rekker
+           ikke nettverkskallet fram, og øyeblikksbildet fanger den
+           serverrenderte «Rediger…» – som så ble gjenopprettet ved HVER
+           menyåpning resten av besøket. Derfor utledes de to på nytt her, fra
+           faktisk rettighet. */
+        samtbuUpdateMenuLabels();
         checkCollaboratorPermission(repo, function(canWrite) {
           if (!canWrite) {
             menu.querySelectorAll('li a span').forEach(function(span) {
@@ -4159,12 +4174,16 @@ function _prFollowUpTitle(orig) {
     : 'Oppfølging av forslag til endring i «' + page + '» på ' + site;
 }
 
-// Bevisst uten tidsestimat («snart», ikke «om ett minutt») – se feedback om
-// PR-akseptmeldinger.
+/* Denne teksten er ALT vi styrer i varselet. Resten – emneprefiks, «X left a
+   comment», svarinstrukser, GitHub Mobile-reklamen – er GitHubs og kan ikke
+   røres. Derfor skal linja være selvbærende: hva som skjedde, og hva som skjer
+   videre. «Om noen minutter» er bevisst valgt framfor «snart» (2026-08-03):
+   det er mer ærlig gitt at CDN henger 2–5 minutter etter bygget. Unngå like
+   fullt presise løfter som «om ett minutt». */
 function _prMergeComment(author) {
   return _prMention(author) + (_prIsEn()
-    ? '– thank you! Your suggestion has been approved and included. The website will be updated shortly.'
-    : '– takk for forslaget! Det er godkjent og tatt inn. Nettstedet oppdateres snart.');
+    ? '– thank you! Your suggestion has been approved and included in the documentation. The website will be updated in a few minutes.'
+    : '– takk for forslaget! Det er godkjent og tatt inn i dokumentasjonen. Nettstedet oppdateres om noen minutter.');
 }
 
 function _prCloseComment(author) {
