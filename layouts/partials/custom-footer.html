@@ -548,10 +548,31 @@ function samtbuPrList() {
 
 // Slå sammen. merge_method 'merge' er bevisst: gir «Merged» (lilla) i GitHub,
 // ikke «Closed» – som er forvirrende for ikke-tekniske bidragsytere.
-function samtbuPrMerge(repo, number, commitTitle) {
+//
+// commitMessage bærer takken til bidragsyteren, inkludert @-omtalen. Den lå
+// tidligere i en egen PR-kommentar lagt ut rett etter mergen, og da ble det TO
+// e-poster: én for merge-hendelsen og én for kommentaren. Ved å legge meldingen
+// i selve merge-committen finnes det bare én hendelse å varsle om.
+function samtbuPrMerge(repo, number, commitTitle, commitMessage) {
   return samtbuGh('/repos/' + SAMTBU_ORG + '/' + repo + '/pulls/' + number + '/merge', {
     method: 'PUT',
-    body: { merge_method: 'merge', commit_title: commitTitle || undefined }
+    body: {
+      merge_method: 'merge',
+      commit_title: commitTitle || undefined,
+      commit_message: commitMessage || undefined
+    }
+  });
+}
+
+// Omdøper PR-en. GitHub bygger e-postens emnefelt som
+// «Re: [org/repo] ‹PR-tittel› (PR #N)» – prefikset og nummeret er deres, men
+// tittelen er vår. En kort tittel tjener PR-lista under behandling; en
+// forklarende tittel tjener bidragsyterens innboks. Derfor byttes den rett før
+// behandlingen fullføres. Tittelendring gir ingen egen e-post.
+function samtbuPrSetTitle(repo, number, title) {
+  return samtbuGh('/repos/' + SAMTBU_ORG + '/' + repo + '/pulls/' + number, {
+    method: 'PATCH',
+    body: { title: title }
   });
 }
 
@@ -1658,7 +1679,9 @@ setTimeout(function() {
             var items = newFiles.concat(results[0]).map(function(f) {
               return {path: f.path, mode: '100644', type: 'blob', content: f.content};
             });
-            var prTitle = (npLang === 'en' ? 'Suggest new page: ' : 'Foreslår ny side: ') + titleNb;
+            var prTitle = npLang === 'en'
+              ? 'Suggested new page: “' + titleNb + '”'
+              : 'Forslag til ny side: «' + titleNb + '»';
             var npSuggester = samtbuSuggesterLink(npLogin);
             var prBody = npLang === 'en'
               ? 'New page suggested by ' + npSuggester + ' via SAMT-BU Docs editor.'
@@ -2023,7 +2046,9 @@ setTimeout(function() {
         {path: enPath, mode: '100644', type: 'blob', sha: null}
       ];
       var delSuggestPrefix = delChildCount > 0 ? delDirPath : null;
-      var delPrTitle = (delLang === 'en' ? 'Suggest deletion: ' : 'Foreslår sletting: ') + delTitle;
+      var delPrTitle = delLang === 'en'
+        ? 'Suggested deletion: “' + delTitle + '”'
+        : 'Forslag om sletting: «' + delTitle + '»';
       var delSuggester = samtbuSuggesterLink(delLogin);
       var delPrBody = delLang === 'en'
         ? 'Deletion suggested by ' + delSuggester + ' via SAMT-BU Docs.'
@@ -2591,7 +2616,9 @@ setTimeout(function() {
           } else {
             var branchName = makePrBranch();
             var cleanTitle = (typeof qePageTitle === 'string') ? qePageTitle.replace(/^"(.*)"$/, '$1') : qePageTitle;
-            var prTitle = (qeLang === 'en' ? 'Suggest change: ' : 'Foreslår endring: ') + cleanTitle;
+            var prTitle = qeLang === 'en'
+              ? 'Suggested change: “' + cleanTitle + '”'
+              : 'Forslag til endring: «' + cleanTitle + '»';
             var qeLogin = localStorage.getItem('samt-bu-gh-user') || 'unknown';
             var qeSuggester = samtbuSuggesterLink(qeLogin);
             var prBody = qeLang === 'en'
@@ -4108,6 +4135,32 @@ function _prMention(author) {
   return (author && author !== 'samt-x-bot') ? '@' + author + ' ' : '';
 }
 
+/* Bygger tittelen bidragsyteren ser i emnefeltet på oppfølgings-e-posten.
+   Sidenavnet hentes fra hermetegnene i den opprinnelige tittelen. Kjenner vi
+   ikke formatet igjen, returneres tittelen urørt – en halvbygd tittel er verre
+   enn den korte. Nettstedet er hardkodet fordi alle repoene som kan ha forslag
+   publiseres til samme sted. */
+function _prFollowUpTitle(orig) {
+  var isEn = _prIsEn();
+  var m = /[«“]([^»”]+)[»”]/.exec(orig || '');
+  if (!m) return orig || '';
+  var page = m[1];
+  var site = 'docs.samt-bu.no';
+  if (/ny side|new page/i.test(orig)) {
+    return isEn
+      ? 'Follow-up on your suggested new page “' + page + '” on ' + site
+      : 'Oppfølging av forslag om ny side «' + page + '» på ' + site;
+  }
+  if (/sletting|deletion/i.test(orig)) {
+    return isEn
+      ? 'Follow-up on your suggested deletion of “' + page + '” on ' + site
+      : 'Oppfølging av forslag om sletting av «' + page + '» på ' + site;
+  }
+  return isEn
+    ? 'Follow-up on your suggested change to “' + page + '” on ' + site
+    : 'Oppfølging av forslag til endring i «' + page + '» på ' + site;
+}
+
 // Bevisst uten tidsestimat («snart», ikke «om ett minutt») – se feedback om
 // PR-akseptmeldinger.
 function _prMergeComment(author) {
@@ -4197,7 +4250,8 @@ function _prRender(prs) {
     var canWrite = !!_prPerm[pr.repo];
     var rowId = 'pr-row-' + pr.repo + '-' + pr.number;
     html += '<div class="pr-row" id="' + _prEsc(rowId) + '"'
-      + ' data-pr-author="' + _prEsc(pr.author) + '">'
+      + ' data-pr-author="' + _prEsc(pr.author) + '"'
+      + ' data-pr-title="' + _prEsc(pr.title) + '">'
       + '<div>'
       +   '<span class="pr-repo">' + _prEsc(pr.repo) + '</span>'
       +   '<a class="pr-title" href="' + _prEsc(pr.url) + '" target="_blank" rel="noopener">'
@@ -4254,8 +4308,8 @@ function _prConfirm(btn, repo, number, act) {
   note.className = 'pr-note pr-note-ask';
   note.style.display = 'block';
   note.textContent = act === 'merge'
-    ? (isEn ? 'This includes the changes in the website and posts a thank-you comment to the contributor. Click "Confirm" to proceed.'
-            : 'Dette tar endringene inn i nettstedet og legger igjen en takkekommentar til bidragsyteren. Klikk «Bekreft» for å fullføre.')
+    ? (isEn ? 'This includes the changes in the website and sends a thank-you to the contributor. Click "Confirm" to proceed.'
+            : 'Dette tar endringene inn i nettstedet og sender en takk til bidragsyteren. Klikk «Bekreft» for å fullføre.')
     : (isEn ? 'This declines the suggestion and posts a friendly comment. Nothing is deleted – it can be reopened in GitHub. Click "Confirm" to proceed.'
             : 'Dette avslår forslaget og legger igjen en vennlig kommentar. Ingenting slettes – det kan gjenåpnes i GitHub. Klikk «Bekreft» for å fullføre.');
 }
@@ -4288,17 +4342,29 @@ function _prExecute(row, btn, repo, number, act) {
     ? (isEn ? 'Merging…' : 'Slår sammen…')
     : (isEn ? 'Declining…' : 'Avslår…');
 
-  var op = act === 'merge'
-    ? samtbuPrMerge(repo, number)
-    : samtbuPrClose(repo, number);
+  var author = row.dataset.prAuthor || '';
+  var newTitle = _prFollowUpTitle(row.dataset.prTitle || '');
+
+  // Omdøpingen skjer FØR handlingen, slik at emnefeltet på varselet blir riktig.
+  // Den er kosmetikk – feiler den, skal behandlingen gå videre likevel.
+  var op = (newTitle && newTitle !== row.dataset.prTitle
+      ? samtbuPrSetTitle(repo, number, newTitle).catch(function() { return null; })
+      : Promise.resolve())
+    .then(function() {
+      return act === 'merge'
+        // Takken ligger i merge-committen, ikke i en egen kommentar: to
+        // hendelser i samme tråd ga to e-poster til bidragsyteren.
+        ? samtbuPrMerge(repo, number, newTitle, _prMergeComment(author))
+        : samtbuPrClose(repo, number);
+    });
 
   op.then(function() {
-    // Kommentaren er en høflighet, ikke en forutsetning – en feil her skal ikke
-    // få handlingen til å se mislykket ut.
-    var author = row.dataset.prAuthor || '';
-    return samtbuPrComment(repo, number,
-      act === 'merge' ? _prMergeComment(author) : _prCloseComment(author)
-    ).catch(function() { return null; });
+    // Avslag har ingen commit å legge meldingen i, så der trengs kommentaren
+    // fortsatt. Den er en høflighet, ikke en forutsetning – en feil her skal
+    // ikke få handlingen til å se mislykket ut.
+    if (act === 'merge') return null;
+    return samtbuPrComment(repo, number, _prCloseComment(author))
+      .catch(function() { return null; });
   }).then(function() {
     note.className = 'pr-note pr-note-ok';
     // ✓ og «Ferdig:» gjør det tydelig at dette er et RESULTAT, ikke et spørsmål
