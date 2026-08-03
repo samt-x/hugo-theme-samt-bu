@@ -1659,9 +1659,10 @@ setTimeout(function() {
               return {path: f.path, mode: '100644', type: 'blob', content: f.content};
             });
             var prTitle = (npLang === 'en' ? 'Suggest new page: ' : 'Foreslår ny side: ') + titleNb;
+            var npSuggester = samtbuSuggesterLink(npLogin);
             var prBody = npLang === 'en'
-              ? 'New page suggested by @' + npLogin + ' via SAMT-BU Docs editor.'
-              : 'Ny side foreslått av @' + npLogin + ' via SAMT-BU Docs redigeringsgrensesnitt.';
+              ? 'New page suggested by ' + npSuggester + ' via SAMT-BU Docs editor.'
+              : 'Ny side foreslått av ' + npSuggester + ' via SAMT-BU Docs redigeringsgrensesnitt.';
             return suggestViaWorker(npRepo, branchName, items, null, commitMsg, prTitle, prBody);
           });
       commitPromise
@@ -2023,9 +2024,10 @@ setTimeout(function() {
       ];
       var delSuggestPrefix = delChildCount > 0 ? delDirPath : null;
       var delPrTitle = (delLang === 'en' ? 'Suggest deletion: ' : 'Foreslår sletting: ') + delTitle;
+      var delSuggester = samtbuSuggesterLink(delLogin);
       var delPrBody = delLang === 'en'
-        ? 'Deletion suggested by @' + delLogin + ' via SAMT-BU Docs.'
-        : 'Sletting foreslått av @' + delLogin + ' via SAMT-BU Docs.';
+        ? 'Deletion suggested by ' + delSuggester + ' via SAMT-BU Docs.'
+        : 'Sletting foreslått av ' + delSuggester + ' via SAMT-BU Docs.';
       var delPromise = canWrite
         ? tryDelCommit(2)
         : suggestViaWorker(delRepo, branchName, delSuggestItems, delSuggestPrefix, commitMsg, delPrTitle, delPrBody);
@@ -2591,9 +2593,10 @@ setTimeout(function() {
             var cleanTitle = (typeof qePageTitle === 'string') ? qePageTitle.replace(/^"(.*)"$/, '$1') : qePageTitle;
             var prTitle = (qeLang === 'en' ? 'Suggest change: ' : 'Foreslår endring: ') + cleanTitle;
             var qeLogin = localStorage.getItem('samt-bu-gh-user') || 'unknown';
+            var qeSuggester = samtbuSuggesterLink(qeLogin);
             var prBody = qeLang === 'en'
-              ? 'Suggested by @' + qeLogin + ' via SAMT-BU Docs editor.'
-              : 'Foreslått av @' + qeLogin + ' via SAMT-BU Docs redigeringsgrensesnitt.';
+              ? 'Suggested by ' + qeSuggester + ' via SAMT-BU Docs editor.'
+              : 'Foreslått av ' + qeSuggester + ' via SAMT-BU Docs redigeringsgrensesnitt.';
             var items = [{path: qeFilePath, mode: '100644', type: 'blob', content: newContent}];
             return suggestViaWorker(qeRepo, branchName, items, null, commitMsg, prTitle, prBody)
               .then(onPrSuccess);
@@ -4082,11 +4085,25 @@ function _prSetStatus(msg) {
   if (el) el.textContent = msg || '';
 }
 
+/* Ren profillenke – bevisst IKKE @-omtale. Ved OPPRETTELSE av et forslag skal
+   forslagsstilleren ikke varsles: hen trykket nettopp lagre og fikk kvittering
+   i grensesnittet. En @-omtale her ga én e-post per lagring – Harald Groven
+   fikk seks på drøyt to timer 6. mai 2026 – og meldte i tillegg vedkommende på
+   hele PR-tråden, slik at hver senere hendelse ga nye e-poster.
+   Lenken gir behandleren samme klikkbare identifikasjon uten å varsle.
+   Omtale ved BEHANDLING beholdes – se _prMention rett under. */
+function samtbuSuggesterLink(login) {
+  if (!login || login === 'unknown') return login || 'ukjent';
+  return '[' + login + '](https://github.com/' + login + ')';
+}
+
 /* @-omtale av forslagsstilleren er ikke en høflighetsfrase – det er den ENESTE
    varslingen vedkommende får. Forslag sendt via workeren har samt-x-bot som
    PR-forfatter, så den ekte personen er verken forfatter, deltaker eller
    abonnent, og GitHub varsler dem ikke om at forslaget er behandlet.
-   En @-omtale utløser varsel. Uten den svarer vi i en tråd ingen leser. */
+   En @-omtale utløser varsel. Uten den svarer vi i en tråd ingen leser.
+   Navnet hentes fra grenavnet (linje ~517), ikke fra PR-beskrivelsen – derfor
+   er denne omtalen uavhengig av samtbuSuggesterLink over. */
 function _prMention(author) {
   return (author && author !== 'samt-x-bot') ? '@' + author + ' ' : '';
 }
