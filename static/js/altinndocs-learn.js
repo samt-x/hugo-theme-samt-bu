@@ -166,9 +166,9 @@ jQuery(document).ready(function() {
         searchedElem && searchedElem.scrollIntoView();
     }
 
-    // clipboard
+    // clipboard - only fenced code blocks, never inline code in running text
     var clipInit = false;
-    $('code').each(function() {
+    $('pre > code').each(function() {
         var code = $(this),
             text = code.text();
 
