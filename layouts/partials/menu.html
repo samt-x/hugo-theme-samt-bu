@@ -54,9 +54,9 @@
     {{ $menuDir := path.Dir .File.Path }}
     {{ if eq $menuDir "utkast" }}
       {{ $menuRepo = "samt-bu-drafts" }}
-    {{ else if eq $menuDir "prosjektleveranser/loesninger/cms-loesninger/samt-bu-docs" }}
+    {{ else if eq $menuDir "prosjektleveranser/loesninger/samhandlingsplattform/samt-bu-docs" }}
       {{ $menuRepo = "solution-samt-bu-docs" }}
-    {{ else if eq $menuDir "prosjektleveranser/loesninger/styringsloesninger/oppgavestyring" }}
+    {{ else if eq $menuDir "prosjektleveranser/loesninger/samhandlingsplattform/oppgavestyring" }}
       {{ $menuRepo = "solution-task-management" }}
     {{ else if eq $menuDir "arkitektur/overordnet-arkitektur" }}
       {{ $menuRepo = "team-architecture" }}
