@@ -93,6 +93,20 @@
     {{ $rel = strings.TrimPrefix "/" $rel }}
     {{ $githubRepo = "samt-bu-pilot-4" }}
 
+  {{ else if or (eq $dir "pilotering/pilot-5") (hasPrefix $dir "pilotering/pilot-5/") }}
+    {{/* samt-bu-pilot-5 modul */}}
+    {{ $isModulePage = true }}
+    {{ $rel = strings.TrimPrefix "pilotering/pilot-5" $dir }}
+    {{ $rel = strings.TrimPrefix "/" $rel }}
+    {{ $githubRepo = "samt-bu-pilot-5" }}
+
+  {{ else if or (eq $dir "pilotering/pilot-6") (hasPrefix $dir "pilotering/pilot-6/") }}
+    {{/* samt-bu-pilot-6 modul */}}
+    {{ $isModulePage = true }}
+    {{ $rel = strings.TrimPrefix "pilotering/pilot-6" $dir }}
+    {{ $rel = strings.TrimPrefix "/" $rel }}
+    {{ $githubRepo = "samt-bu-pilot-6" }}
+
   {{ else if or (eq $dir "ekstern-markedsdialog") (hasPrefix $dir "ekstern-markedsdialog/") }}
     {{/* samt-bu-market-engagement modul */}}
     {{ $isModulePage = true }}
@@ -147,6 +161,12 @@
   {{ else if or (eq $dir "pilotering/pilot-4") (hasPrefix $dir "pilotering/pilot-4/") }}
     {{ $rel = strings.TrimPrefix "pilotering/pilot-4" $dir }}
     {{ $rel = strings.TrimPrefix "/" $rel }}
+  {{ else if or (eq $dir "pilotering/pilot-5") (hasPrefix $dir "pilotering/pilot-5/") }}
+    {{ $rel = strings.TrimPrefix "pilotering/pilot-5" $dir }}
+    {{ $rel = strings.TrimPrefix "/" $rel }}
+  {{ else if or (eq $dir "pilotering/pilot-6") (hasPrefix $dir "pilotering/pilot-6/") }}
+    {{ $rel = strings.TrimPrefix "pilotering/pilot-6" $dir }}
+    {{ $rel = strings.TrimPrefix "/" $rel }}
   {{ else if or (eq $dir "ekstern-markedsdialog") (hasPrefix $dir "ekstern-markedsdialog/") }}
     {{ $rel = strings.TrimPrefix "ekstern-markedsdialog" $dir }}
     {{ $rel = strings.TrimPrefix "/" $rel }}
@@ -163,6 +183,8 @@
     {{ if or (eq $dir "pilotering/pilot-2") (hasPrefix $dir "pilotering/pilot-2/") }}{{ $githubRepoSibling = "samt-bu-pilot-2" }}{{ end }}
     {{ if or (eq $dir "pilotering/pilot-3") (hasPrefix $dir "pilotering/pilot-3/") }}{{ $githubRepoSibling = "samt-bu-pilot-3" }}{{ end }}
     {{ if or (eq $dir "pilotering/pilot-4") (hasPrefix $dir "pilotering/pilot-4/") }}{{ $githubRepoSibling = "samt-bu-pilot-4" }}{{ end }}
+    {{ if or (eq $dir "pilotering/pilot-5") (hasPrefix $dir "pilotering/pilot-5/") }}{{ $githubRepoSibling = "samt-bu-pilot-5" }}{{ end }}
+    {{ if or (eq $dir "pilotering/pilot-6") (hasPrefix $dir "pilotering/pilot-6/") }}{{ $githubRepoSibling = "samt-bu-pilot-6" }}{{ end }}
     {{ if or (eq $dir "ekstern-markedsdialog") (hasPrefix $dir "ekstern-markedsdialog/") }}{{ $githubRepoSibling = "samt-bu-market-engagement" }}{{ end }}
     {{ $parentRel := path.Dir $rel }}
     {{ $parentDirPath := cond (eq $parentRel ".") "content" (printf "content/%s" $parentRel) }}
@@ -635,6 +657,12 @@
     {{- else if or (eq $d2 "pilotering/pilot-4") (hasPrefix $d2 "pilotering/pilot-4/") -}}
       {{- $x2 = true -}}{{- $r2 = "samt-bu-pilot-4" -}}
       {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "pilotering/pilot-4" $d2) -}}
+    {{- else if or (eq $d2 "pilotering/pilot-5") (hasPrefix $d2 "pilotering/pilot-5/") -}}
+      {{- $x2 = true -}}{{- $r2 = "samt-bu-pilot-5" -}}
+      {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "pilotering/pilot-5" $d2) -}}
+    {{- else if or (eq $d2 "pilotering/pilot-6") (hasPrefix $d2 "pilotering/pilot-6/") -}}
+      {{- $x2 = true -}}{{- $r2 = "samt-bu-pilot-6" -}}
+      {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "pilotering/pilot-6" $d2) -}}
     {{- else if or (eq $d2 "ekstern-markedsdialog") (hasPrefix $d2 "ekstern-markedsdialog/") -}}
       {{- $x2 = true -}}{{- $r2 = "samt-bu-market-engagement" -}}
       {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "ekstern-markedsdialog" $d2) -}}
