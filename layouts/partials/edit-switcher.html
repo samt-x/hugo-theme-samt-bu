@@ -52,6 +52,13 @@
     {{ $rel = strings.TrimPrefix "/" $rel }}
     {{ $githubRepo = "solution-samt-bu-docs" }}
 
+  {{ else if or (eq $dir "prosjektleveranser/loesninger/styringsloesninger/oppgavestyring") (hasPrefix $dir "prosjektleveranser/loesninger/styringsloesninger/oppgavestyring/") }}
+    {{/* solution-task-management modul */}}
+    {{ $isModulePage = true }}
+    {{ $rel = strings.TrimPrefix "prosjektleveranser/loesninger/styringsloesninger/oppgavestyring" $dir }}
+    {{ $rel = strings.TrimPrefix "/" $rel }}
+    {{ $githubRepo = "solution-task-management" }}
+
   {{ else if and (or (eq $dir "arkitektur/overordnet-arkitektur") (hasPrefix $dir "arkitektur/overordnet-arkitektur/")) (not $isLocalUnderOverordnet) }}
     {{/* team-architecture modul – maalbildet og veikart er lokale i samt-bu-docs */}}
     {{ $isModulePage = true }}
@@ -146,6 +153,9 @@
   {{ else if or (eq $dir "prosjektleveranser/loesninger/cms-loesninger/samt-bu-docs") (hasPrefix $dir "prosjektleveranser/loesninger/cms-loesninger/samt-bu-docs/") }}
     {{ $rel = strings.TrimPrefix "prosjektleveranser/loesninger/cms-loesninger/samt-bu-docs" $dir }}
     {{ $rel = strings.TrimPrefix "/" $rel }}
+  {{ else if or (eq $dir "prosjektleveranser/loesninger/styringsloesninger/oppgavestyring") (hasPrefix $dir "prosjektleveranser/loesninger/styringsloesninger/oppgavestyring/") }}
+    {{ $rel = strings.TrimPrefix "prosjektleveranser/loesninger/styringsloesninger/oppgavestyring" $dir }}
+    {{ $rel = strings.TrimPrefix "/" $rel }}
   {{ else if and (or (eq $dir "arkitektur/overordnet-arkitektur") (hasPrefix $dir "arkitektur/overordnet-arkitektur/")) (not $isLocalUnderOverordnet) }}
     {{ $rel = strings.TrimPrefix "arkitektur/overordnet-arkitektur" $dir }}
     {{ $rel = strings.TrimPrefix "/" $rel }}
@@ -178,6 +188,7 @@
     {{ $githubRepoSibling := "samt-bu-docs" }}
     {{ if or (eq $dir "utkast") (hasPrefix $dir "utkast/") }}{{ $githubRepoSibling = "samt-bu-drafts" }}{{ end }}
     {{ if or (eq $dir "prosjektleveranser/loesninger/cms-loesninger/samt-bu-docs") (hasPrefix $dir "prosjektleveranser/loesninger/cms-loesninger/samt-bu-docs/") }}{{ $githubRepoSibling = "solution-samt-bu-docs" }}{{ end }}
+    {{ if or (eq $dir "prosjektleveranser/loesninger/styringsloesninger/oppgavestyring") (hasPrefix $dir "prosjektleveranser/loesninger/styringsloesninger/oppgavestyring/") }}{{ $githubRepoSibling = "solution-task-management" }}{{ end }}
     {{ if and (or (eq $dir "arkitektur/overordnet-arkitektur") (hasPrefix $dir "arkitektur/overordnet-arkitektur/")) (not $isLocalUnderOverordnet) }}{{ $githubRepoSibling = "team-architecture" }}{{ end }}
     {{ if or (eq $dir "pilotering/pilot-1") (hasPrefix $dir "pilotering/pilot-1/") }}{{ $githubRepoSibling = "samt-bu-pilot-1" }}{{ end }}
     {{ if or (eq $dir "pilotering/pilot-2") (hasPrefix $dir "pilotering/pilot-2/") }}{{ $githubRepoSibling = "samt-bu-pilot-2" }}{{ end }}
@@ -640,6 +651,9 @@
     {{- else if or (eq $d2 "prosjektleveranser/loesninger/cms-loesninger/samt-bu-docs") (hasPrefix $d2 "prosjektleveranser/loesninger/cms-loesninger/samt-bu-docs/") -}}
       {{- $x2 = true -}}{{- $r2 = "solution-samt-bu-docs" -}}
       {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "prosjektleveranser/loesninger/cms-loesninger/samt-bu-docs" $d2) -}}
+    {{- else if or (eq $d2 "prosjektleveranser/loesninger/styringsloesninger/oppgavestyring") (hasPrefix $d2 "prosjektleveranser/loesninger/styringsloesninger/oppgavestyring/") -}}
+      {{- $x2 = true -}}{{- $r2 = "solution-task-management" -}}
+      {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "prosjektleveranser/loesninger/styringsloesninger/oppgavestyring" $d2) -}}
     {{- else if and (or (eq $d2 "arkitektur/overordnet-arkitektur") (hasPrefix $d2 "arkitektur/overordnet-arkitektur/")) (not $isLocalD2) -}}
       {{- $x2 = true -}}{{- $r2 = "team-architecture" -}}
       {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "arkitektur/overordnet-arkitektur" $d2) -}}
