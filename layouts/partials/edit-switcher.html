@@ -1,5 +1,5 @@
 {{/* Edit switcher: dropdown for å redigere gjeldende side (WYSIWYG), opprette ny side, slette, osv.
-     Modul-sider (utkast/*, prosjektleveranser/loesninger/samhandlingsplattform/samt-bu-docs/*, arkitektur/overordnet-arkitektur/*, pilotering/pilot-1, arkitektur/informasjonsarkitektur) peker til riktig repo.
+     Modul-sider (utkast/*, prosjektleveranser/loesninger/samhandlingsplattform/samt-bu-docs/*, arkitektur/overordnet-arkitektur/*, pilotering/pilot-1, arkitektur/informasjonsarkitektur/*) peker til riktig repo.
      Rot-sider i moduler er redigerbare; docs-rot forblir deaktivert (tom entrySlug). */}}
 {{ $lang := .Site.Language.Lang }}
 {{ $entrySlug := "" }}
@@ -66,10 +66,11 @@
     {{ $rel = strings.TrimPrefix "/" $rel }}
     {{ $githubRepo = "team-architecture" }}
 
-  {{ else if eq $dir "arkitektur/informasjonsarkitektur" }}
-    {{/* team-semantics modul – kun rot-siden; undermapper er lokale i samt-bu-docs */}}
+  {{ else if or (eq $dir "arkitektur/informasjonsarkitektur") (hasPrefix $dir "arkitektur/informasjonsarkitektur/") }}
+    {{/* team-semantics modul – hele stien, også undersider (solution-samt-bu-docs#78) */}}
     {{ $isModulePage = true }}
-    {{ $rel = "" }}
+    {{ $rel = strings.TrimPrefix "arkitektur/informasjonsarkitektur" $dir }}
+    {{ $rel = strings.TrimPrefix "/" $rel }}
     {{ $githubRepo = "team-semantics" }}
 
   {{ else if or (eq $dir "pilotering/pilot-1") (hasPrefix $dir "pilotering/pilot-1/") }}
@@ -159,6 +160,9 @@
   {{ else if and (or (eq $dir "arkitektur/overordnet-arkitektur") (hasPrefix $dir "arkitektur/overordnet-arkitektur/")) (not $isLocalUnderOverordnet) }}
     {{ $rel = strings.TrimPrefix "arkitektur/overordnet-arkitektur" $dir }}
     {{ $rel = strings.TrimPrefix "/" $rel }}
+  {{ else if or (eq $dir "arkitektur/informasjonsarkitektur") (hasPrefix $dir "arkitektur/informasjonsarkitektur/") }}
+    {{ $rel = strings.TrimPrefix "arkitektur/informasjonsarkitektur" $dir }}
+    {{ $rel = strings.TrimPrefix "/" $rel }}
   {{ else if or (eq $dir "pilotering/pilot-1") (hasPrefix $dir "pilotering/pilot-1/") }}
     {{ $rel = strings.TrimPrefix "pilotering/pilot-1" $dir }}
     {{ $rel = strings.TrimPrefix "/" $rel }}
@@ -190,6 +194,7 @@
     {{ if or (eq $dir "prosjektleveranser/loesninger/samhandlingsplattform/samt-bu-docs") (hasPrefix $dir "prosjektleveranser/loesninger/samhandlingsplattform/samt-bu-docs/") }}{{ $githubRepoSibling = "solution-samt-bu-docs" }}{{ end }}
     {{ if or (eq $dir "prosjektleveranser/loesninger/samhandlingsplattform/oppgavestyring") (hasPrefix $dir "prosjektleveranser/loesninger/samhandlingsplattform/oppgavestyring/") }}{{ $githubRepoSibling = "solution-task-management" }}{{ end }}
     {{ if and (or (eq $dir "arkitektur/overordnet-arkitektur") (hasPrefix $dir "arkitektur/overordnet-arkitektur/")) (not $isLocalUnderOverordnet) }}{{ $githubRepoSibling = "team-architecture" }}{{ end }}
+    {{ if or (eq $dir "arkitektur/informasjonsarkitektur") (hasPrefix $dir "arkitektur/informasjonsarkitektur/") }}{{ $githubRepoSibling = "team-semantics" }}{{ end }}
     {{ if or (eq $dir "pilotering/pilot-1") (hasPrefix $dir "pilotering/pilot-1/") }}{{ $githubRepoSibling = "samt-bu-pilot-1" }}{{ end }}
     {{ if or (eq $dir "pilotering/pilot-2") (hasPrefix $dir "pilotering/pilot-2/") }}{{ $githubRepoSibling = "samt-bu-pilot-2" }}{{ end }}
     {{ if or (eq $dir "pilotering/pilot-3") (hasPrefix $dir "pilotering/pilot-3/") }}{{ $githubRepoSibling = "samt-bu-pilot-3" }}{{ end }}
@@ -657,8 +662,9 @@
     {{- else if and (or (eq $d2 "arkitektur/overordnet-arkitektur") (hasPrefix $d2 "arkitektur/overordnet-arkitektur/")) (not $isLocalD2) -}}
       {{- $x2 = true -}}{{- $r2 = "team-architecture" -}}
       {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "arkitektur/overordnet-arkitektur" $d2) -}}
-    {{- else if eq $d2 "arkitektur/informasjonsarkitektur" -}}
+    {{- else if or (eq $d2 "arkitektur/informasjonsarkitektur") (hasPrefix $d2 "arkitektur/informasjonsarkitektur/") -}}
       {{- $x2 = true -}}{{- $r2 = "team-semantics" -}}
+      {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "arkitektur/informasjonsarkitektur" $d2) -}}
     {{- else if or (eq $d2 "pilotering/pilot-1") (hasPrefix $d2 "pilotering/pilot-1/") -}}
       {{- $x2 = true -}}{{- $r2 = "samt-bu-pilot-1" -}}
       {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "pilotering/pilot-1" $d2) -}}
