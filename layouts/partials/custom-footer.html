@@ -3824,14 +3824,13 @@ setTimeout(function() {
       .then(function(res) {
         var info = res[1];
         // GitHub kan melde kjøringer ferdige minutter for sent. Kjøringene går én om gangen
-        // i rekkefølge, så alt til og med kjøringen i byggkvitteringen er publisert.
+        // i rekkefølge, så alt til og med kjøringen i byggkvitteringen er publisert. Varigheten
+        // regnes da til built_at, som er satt før deploy og derfor ca. 30 sek for kort.
         _historyRuns = (res[0].workflow_runs || []).map(function(run) {
-          if (!info || !info.run_id || run.id > info.run_id) return run;
-          if (run.id === info.run_id) {
-            return Object.assign({}, run, { status: 'completed', conclusion: 'success', updated_at: info.built_at });
-          }
-          if (run.status !== 'completed') return Object.assign({}, run, { status: 'completed', conclusion: 'success' });
-          return run;
+          if (!info || !info.run_id || run.id > info.run_id || run.status === 'completed') return run;
+          var settled = { status: 'completed', conclusion: 'success' };
+          if (run.id === info.run_id) settled.updated_at = info.built_at;
+          return Object.assign({}, run, settled);
         });
         renderHistory(_historyRuns);
       })
