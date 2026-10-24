@@ -837,7 +837,7 @@ function samtbuWaitForCommit(repo, sha, startTime, onDone, onError, onStatus) {
     samtbuFetchBuildInfo().then(function(info) {
       busy = false;
       if (finished) return;
-      if (samtbuBuildHasCommit(info, repo, sha)) { finished = true; clearInterval(timer); samtbuPlaySuccess(); onDone(); return; }
+      if (samtbuBuildHasCommit(info, repo, sha)) { finished = true; clearInterval(timer); samtbuSettlePending(info); onDone(); return; }
       onStatus(secs);
       if (secs < 300 || Date.now() - lastApiCheck < 30000) return;
       lastApiCheck = Date.now();
@@ -1056,13 +1056,21 @@ function _samtbuPlayNotes(notes) {
   return Math.ceil(end * 1000);
 }
 
-// Spill tale etter en forsinkelse (slik at lydsignal alltid kommer først)
-// onEnd (valgfri) kalles når talen er ferdig – eller etter en reservetid hvis talen
-// ikke spilles (blokkert, ikke støttet). Brukes før sideinnlasting, som ellers kutter talen.
-function _samtbuSpeak(text, delayMs, onEnd) {
+// Spill tale etter en forsinkelse (slik at lydsignal alltid kommer først).
+// Talen telles mens den pågår, slik at samtbuWhenQuiet kan vente med sideinnlasting –
+// ellers kuttes den. Reservetid hvis talen ikke spilles (blokkert, ikke støttet).
+var _samtbuSpeechPending = 0, _samtbuQuietWaiters = [];
+function _samtbuSpeak(text, delayMs) {
   var called = false;
-  function finish() { if (!called) { called = true; if (onEnd) onEnd(); } }
-  if (onEnd) setTimeout(finish, delayMs + 1500 + text.length * 90);
+  _samtbuSpeechPending++;
+  function finish() {
+    if (called) return;
+    called = true;
+    if (--_samtbuSpeechPending > 0) return;
+    var waiters = _samtbuQuietWaiters; _samtbuQuietWaiters = [];
+    waiters.forEach(function(fn) { fn(); });
+  }
+  setTimeout(finish, delayMs + 1500 + text.length * 90);
   try {
     setTimeout(function() {
       var u = new SpeechSynthesisUtterance(text);
@@ -1074,11 +1082,15 @@ function _samtbuSpeak(text, delayMs, onEnd) {
   } catch(e) { finish(); }
 }
 
-// Opptakt – to stigende pip (kalles når byggjobb starter)
-function samtbuPlayStart(speechText) {
-  // 600 Hz (120ms) → 900 Hz (200ms) → tale
-  var ms = _samtbuPlayNotes([[600,0,0.12],[900,0.15,0.20]]);
-  _samtbuSpeak(speechText || 'Build job started', ms + 150);
+// Kjør fn når ingen tale pågår – brukes før sideinnlasting og navigering etter bygg
+function samtbuWhenQuiet(fn) {
+  if (_samtbuSpeechPending > 0) _samtbuQuietWaiters.push(fn);
+  else fn();
+}
+
+// Opptakt – to stigende pip uten tale (kalles når byggjobb starter)
+function samtbuPlayStart() {
+  _samtbuPlayNotes([[600,0,0.12],[900,0.15,0.20]]);
 }
 
 // Hjelpefunksjon: tall til ord for TTS (0–10, ellers siffer)
@@ -1087,11 +1099,36 @@ function _numWord(n) {
   return n >= 0 && n < w.length ? w[n] : String(n);
 }
 
-// Seiersfanfare – C-E-G-C stigende (kalles når bygg er ferdig)
-function samtbuPlaySuccess(speechText, onEnd) {
+// Seiersfanfare – C-E-G-C stigende. Kalles bare via samtbuSettlePending, når ALLE
+// egne jobber er publisert – ett signal per runde, ikke ett per jobb.
+function samtbuPlaySuccess(speechText) {
   // C5–E5–G5–C6, siste tone lang for avslutningseffekt
   var ms = _samtbuPlayNotes([[523,0,0.22],[659,0.25,0.22],[784,0.50,0.22],[1047,0.75,0.60]]);
-  _samtbuSpeak(speechText || 'Build job complete', ms + 150, onEnd);
+  _samtbuSpeak(speechText || 'All your documentation jobs completed', ms + 150);
+}
+
+// En egen commit er publisert: fjern det som er ute fra køen. Er køen tom, spill
+// ferdig-signalet og vis «publisert». Er det jobber igjen, er det stille.
+// Uten kø (allerede ryddet av en annen flyt eller fane) er det også stille.
+function samtbuSettlePending(info) {
+  var p = samtbuGetPending();
+  if (!p) return;
+  var left = (p.commits || []).filter(function(c) { return !samtbuBuildHasCommit(info, c.repo, c.sha); });
+  if (left.length) {
+    p.commits = left;
+    p.count = left.length;
+    try { localStorage.setItem(SAMTBU_PENDING_KEY, JSON.stringify(p)); } catch(e) {}
+    samtbuShowPendingIndicator(left.length);
+    return;
+  }
+  samtbuClearPending();
+  samtbuShowDoneIndicator();
+  samtbuPlaySuccess();
+}
+
+// Som over, for flyter som har sett publiseringen på annen måte enn via kvitteringen
+function samtbuSettleFromSite(onDone) {
+  samtbuFetchBuildInfo().then(function(info) { samtbuSettlePending(info); onDone(); });
 }
 
 // Wah-wah – tre fallende toner (kalles ved feil eller timeout)
@@ -1122,7 +1159,7 @@ function startGhPoll(startTime, onDone, onError, onStatus) {
         if (run.status === 'queued' || run.status === 'in_progress') {
           onStatus('Bygger…');
         } else if (run.status === 'completed') {
-          if (run.conclusion === 'success') { samtbuPlaySuccess(); onDone(); }
+          if (run.conclusion === 'success') { samtbuSettleFromSite(onDone); }
           else if (run.conclusion === 'cancelled') { onStatus('Avløst – venter på nytt bygg…'); }
           else { samtbuPlayFailure(); onError(run.conclusion); }
         }
@@ -1161,7 +1198,7 @@ function startUrlPoll(url, onDone, onError, onStatus, startTime) {
           if (run.status === 'in_progress' || run.status === 'queued') {
             attempts = 0; // Bygg pågår – nullstill teller og fortsett poll
           } else if (run.status === 'completed' && run.conclusion === 'success') {
-            clearInterval(timer); samtbuPlaySuccess(); onDone();
+            clearInterval(timer); samtbuSettleFromSite(onDone);
           } else if (run.status === 'completed' && run.conclusion === 'cancelled') {
             attempts = 0; onStatus('Avbrutt – venter på nytt bygg…');
           } else {
@@ -1174,7 +1211,7 @@ function startUrlPoll(url, onDone, onError, onStatus, startTime) {
     fetch(url + (url.indexOf('?') >= 0 ? '&' : '?') + '_cf=' + Date.now(),
           { method: 'HEAD', cache: 'no-store' })
       .then(function(r) {
-        if (r.ok) { samtbuPlaySuccess(); onDone(); }
+        if (r.ok) { clearInterval(timer); samtbuSettleFromSite(onDone); }
         else onStatus(attempts);
       })
       .catch(function() { onStatus('Venter…'); });
@@ -1226,40 +1263,25 @@ setTimeout(function() {
   if ((Date.now() - p.firstSaveAt) > 1200000) { samtbuClearPending(); return; } // > 20 min – anta ferdig
   samtbuShowPendingIndicator(p.count);
 
-  function onAllMineDone() {
-    samtbuClearPending();
-    samtbuShowDoneIndicator();
-    // Last inn på nytt først når talen er ferdig – ellers kuttes den
-    samtbuPlaySuccess('All your documentation jobs completed', function() {
+  // Last inn på nytt når talen er ferdig – ellers kuttes den
+  function reloadWhenQuiet() {
+    samtbuWhenQuiet(function() {
       if (!samtbuHasVisibleDialog()) {
         window.location.href = window.location.href.split('?')[0] + '?_=' + Date.now();
       }
     });
   }
 
-  // Commits lagret: sjekk mot byggkvitteringen, ikke GitHubs kjørestatus
+  // Commits lagret: sjekk mot byggkvitteringen, ikke GitHubs kjørestatus.
+  // samtbuSettlePending gir ett signal når alle er ute, ingen mellomsignaler.
   if (p.commits && p.commits.length) {
     var checkCommits = function() {
       var p2 = samtbuGetPending();
       if (!p2 || !p2.commits || !p2.commits.length) { clearInterval(commitTimer); return; }
       samtbuFetchBuildInfo().then(function(info) {
         if (!info) return;
-        var left = p2.commits.filter(function(c) { return !samtbuBuildHasCommit(info, c.repo, c.sha); });
-        if (!left.length) {
-          clearInterval(commitTimer);
-          onAllMineDone();
-        } else if (left.length < p2.commits.length) {
-          var done = p2.commits.length - left.length;
-          p2.commits = left;
-          p2.count = left.length;
-          try { localStorage.setItem(SAMTBU_PENDING_KEY, JSON.stringify(p2)); } catch(e) {}
-          samtbuShowPendingIndicator(left.length);
-          var completedWord = done === 1 ? 'One of your documentation jobs completed' : _numWord(done) + ' of your documentation jobs completed';
-          var remainingWord = left.length === 1 ? 'one remaining' : _numWord(left.length) + ' remaining';
-          samtbuPlaySuccess(completedWord + ', ' + remainingWord);
-        } else {
-          samtbuShowPendingIndicator(left.length);
-        }
+        samtbuSettlePending(info);
+        if (!samtbuGetPending()) { clearInterval(commitTimer); reloadWhenQuiet(); }
       });
     };
     checkCommits();
@@ -1314,11 +1336,8 @@ setTimeout(function() {
           if (othersActive > 0) {
             doneSpeech += ', ' + _numWord(othersActive) + ' other update ' + (othersActive === 1 ? 'job' : 'jobs') + ' in progress';
           }
-          samtbuPlaySuccess(doneSpeech, function() {
-            if (!samtbuHasVisibleDialog()) {
-              window.location.href = window.location.href.split('?')[0] + '?_=' + Date.now();
-            }
-          });
+          samtbuPlaySuccess(doneSpeech);
+          reloadWhenQuiet();
         } else if (newCompletions > 0 || newCancellations > 0) {
           // Nye fullføringer eller kanseller – oppdater teller og lagret tilstand
           var newCount = Math.max(1, (p2.count || 0) - newCompletions);
@@ -1330,11 +1349,6 @@ setTimeout(function() {
             }));
           } catch(e) {}
           samtbuShowPendingIndicatorWithTotal(newCount, totalActive);
-          if (newCompletions > 0) {
-            var completedWord = newCompletions === 1 ? 'One of your documentation jobs completed' : _numWord(newCompletions) + ' of your documentation jobs completed';
-            var remainingWord = newCount === 1 ? 'one remaining' : _numWord(newCount) + ' remaining';
-            samtbuPlaySuccess(completedWord + ', ' + remainingWord);
-          }
         } else {
           // Ingen nye hendelser ennå
           samtbuShowPendingIndicatorWithTotal(p2.count, totalActive);
@@ -2104,7 +2118,9 @@ setTimeout(function() {
     npActivePollTimer = startUrlPoll(npNewPageUrl,
       function onDone() {
         clearInterval(npActivePollTimer); npActivePollTimer = null;
-        window.location.href = window.location.href.split('?')[0] + '?_=' + Date.now();
+        samtbuWhenQuiet(function() {
+          window.location.href = window.location.href.split('?')[0] + '?_=' + Date.now();
+        });
       },
       function onError(reason) {
         clearInterval(npActivePollTimer); npActivePollTimer = null;
@@ -2458,8 +2474,7 @@ setTimeout(function() {
     samtbuPlayStart();
 
     function onDone() {
-      samtbuPlaySuccess();
-      finish();
+      samtbuSettleFromSite(finish);
     }
 
     function finish() {
@@ -2471,7 +2486,7 @@ setTimeout(function() {
       if (statusEl) statusEl.textContent = (lang === 'en' ? '✓ Done! Navigating in ' : '✓ Ferdig! Navigerer om ') + secs + (lang === 'en' ? 's…' : ' sek…');
       var cdTimer = setInterval(function() {
         secs--;
-        if (secs <= 0) { clearInterval(cdTimer); navAfterDelete(); return; }
+        if (secs <= 0) { clearInterval(cdTimer); samtbuWhenQuiet(navAfterDelete); return; }
         var el = document.getElementById('del-build-status-text');
         if (el) el.textContent = (lang === 'en' ? '✓ Done! Navigating in ' : '✓ Ferdig! Navigerer om ') + secs + (lang === 'en' ? 's…' : ' sek…');
       }, 1000);
@@ -2894,7 +2909,7 @@ setTimeout(function() {
     function onBuildDone() {
       clearInterval(qePollTimer); qePollTimer = null;
       if (overlay.style.display !== 'none') {
-        // Dialog er åpen: 3s gir fanfare (1.35s) + tale (starter 1.5s) tid til å spille
+        // Dialog er åpen: vis «Ferdig» i 3 sek, og vent i tillegg til et eventuelt ferdig-signal er spilt
         var secs = 3;
         setStatus(lang === 'en' ? '✓ Done! Reloading in ' + secs + 's…' : '✓ Ferdig! Laster inn om ' + secs + ' sek…');
         var btn = document.getElementById('qe-save-btn');
@@ -2905,10 +2920,10 @@ setTimeout(function() {
           btn.textContent = lang === 'en' ? 'Reload now ↗' : 'Last inn nå ↗';
           btn.onclick = function() { clearTimeout(navTimer); doNav(); };
         }
-        var navTimer = setTimeout(doNav, secs * 1000);
+        var navTimer = setTimeout(function() { samtbuWhenQuiet(doNav); }, secs * 1000);
       } else {
-        // Dialog er lukket: forsinkelse slik at fanfare rekker å spille
-        setTimeout(doNav, 1600);
+        // Dialog er lukket: last inn når ferdig-signalet (om noe) er spilt
+        samtbuWhenQuiet(doNav);
       }
     }
 
@@ -4095,13 +4110,15 @@ function _mvOpenBuildDialog(startTime, sourcePerm, isEn, oldEtag, repo, sha) {
   samtbuIncrementPending(repo, sha);
   var timer;
 
+  // Køen ryddes av samtbuSettlePending (ett ferdig-signal når alt er ute) – ikke tell ned her
   function onBuildDone() {
     clearInterval(timer);
-    samtbuDecrementPending();
     statusEl.textContent = isEn ? '✓ Published! Navigating to source page…' : '✓ Publisert! Navigerer til kildesiden…';
     doneBtn.style.display = 'inline-block';
     doneBtn.onclick = function() { overlay.remove(); window.location.href = sourcePerm + '?_=' + Date.now(); };
-    setTimeout(function() { overlay.remove(); window.location.href = sourcePerm + '?_=' + Date.now(); }, 1500);
+    setTimeout(function() {
+      samtbuWhenQuiet(function() { overlay.remove(); window.location.href = sourcePerm + '?_=' + Date.now(); });
+    }, 1500);
   }
   function onBuildError(reason) {
     clearInterval(timer);
@@ -4142,7 +4159,7 @@ function _mvOpenBuildDialog(startTime, sourcePerm, isEn, oldEtag, repo, sha) {
             if (run.status === 'in_progress' || run.status === 'queued') {
               attempts = 0; // Bygg pågår – nullstill teller og fortsett ETag-poll
             } else if (run.status === 'completed' && run.conclusion === 'success') {
-              clearInterval(timer); samtbuPlaySuccess(); onBuildDone();
+              clearInterval(timer); samtbuSettleFromSite(onBuildDone);
             } else if (run.status === 'completed' && run.conclusion === 'cancelled') {
               attempts = 0; statusEl.textContent = isEn ? 'Cancelled – waiting for new build…' : 'Avbrutt – venter på nytt bygg…';
             } else {
@@ -4155,7 +4172,7 @@ function _mvOpenBuildDialog(startTime, sourcePerm, isEn, oldEtag, repo, sha) {
       fetch(sourcePerm + '?_cf=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
         .then(function(r) {
           var newEtag = r.headers.get('etag') || r.headers.get('last-modified');
-          if (r.ok && newEtag && newEtag !== oldEtag) { samtbuPlaySuccess(); onBuildDone(); }
+          if (r.ok && newEtag && newEtag !== oldEtag) { clearInterval(timer); samtbuSettleFromSite(onBuildDone); }
           else statusEl.textContent = isEn ? 'Updating site (' + attempts + 's)…' : 'Nettstedet oppdateres (' + attempts + ' sek)…';
         })
         .catch(function() {});
@@ -4168,7 +4185,8 @@ function _mvOpenBuildDialog(startTime, sourcePerm, isEn, oldEtag, repo, sha) {
     });
   }
 
-  var doClose = function() { clearInterval(timer); samtbuDecrementPending(); overlay.remove(); };
+  // Lukking avbryter bare dialogen – jobben står i køen og følges av indikatoren
+  var doClose = function() { clearInterval(timer); overlay.remove(); };
   closeBtn.onclick = doClose; xBtn.onclick = doClose;
 }
 
