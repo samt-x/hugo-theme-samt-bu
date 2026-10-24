@@ -786,12 +786,15 @@ var SAMTBU_PENDING_KEY = 'samt-bu-build-pending';
 function samtbuGetPending() {
   try { return JSON.parse(localStorage.getItem(SAMTBU_PENDING_KEY)); } catch(e) { return null; }
 }
-function samtbuIncrementPending() {
+// repo/sha: commiten som venter på publisering – sjekkes mot /build.json ved ny sideinnlasting
+function samtbuIncrementPending(repo, sha) {
   var p = samtbuGetPending() || { count: 0 };
   var now = Date.now();
   var actor = localStorage.getItem('samt-bu-gh-user') || '';
   var newCount = (p.count || 0) + 1;
-  try { localStorage.setItem(SAMTBU_PENDING_KEY, JSON.stringify({ count: newCount, firstSaveAt: p.firstSaveAt || now, lastSaveAt: now, seenCompleted: p.seenCompleted || 0, seenCancelled: p.seenCancelled || 0, actor: p.actor || actor, moduleRepo: p.moduleRepo || false })); } catch(e) {}
+  var commits = p.commits || [];
+  if (repo && sha) commits.push({ repo: repo, sha: sha });
+  try { localStorage.setItem(SAMTBU_PENDING_KEY, JSON.stringify({ count: newCount, firstSaveAt: p.firstSaveAt || now, lastSaveAt: now, seenCompleted: p.seenCompleted || 0, seenCancelled: p.seenCancelled || 0, actor: p.actor || actor, moduleRepo: p.moduleRepo || false, commits: commits })); } catch(e) {}
   samtbuShowPendingIndicator(newCount);
 }
 function samtbuDecrementPending() {
@@ -801,9 +804,63 @@ function samtbuDecrementPending() {
   if (newCount <= 0) {
     samtbuClearPending();
   } else {
-    try { localStorage.setItem(SAMTBU_PENDING_KEY, JSON.stringify({ count: newCount, firstSaveAt: p.firstSaveAt, lastSaveAt: p.lastSaveAt, seenCompleted: (p.seenCompleted || 0) + 1 })); } catch(e) {}
+    p.count = newCount;
+    p.seenCompleted = (p.seenCompleted || 0) + 1;
+    try { localStorage.setItem(SAMTBU_PENDING_KEY, JSON.stringify(p)); } catch(e) {}
     samtbuShowPendingIndicator(newCount);
   }
+}
+
+// Byggkvittering: bygget skriver /build.json med de siste commitene per repo, og den
+// publiseres sammen med sidene. Står commiten der, er endringen ute. GitHubs kjørestatus
+// kan henge i minutter og brukes bare til å oppdage feilet bygg (solution-samt-bu-docs#77).
+function samtbuFetchBuildInfo() {
+  return fetch('/build.json?_=' + Date.now(), { cache: 'no-store' })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .catch(function() { return null; });
+}
+function samtbuBuildHasCommit(info, repo, sha) {
+  var list = info && info.repos && info.repos[String(repo).toLowerCase()];
+  return !!(list && sha && list.indexOf(sha) !== -1);
+}
+
+// Vent til commiten er publisert. onStatus får antall sekunder siden start.
+// Etter 5 min spørres GitHub hvert 30. sek om bygget har feilet; etter 20 min gis det opp.
+function samtbuWaitForCommit(repo, sha, startTime, onDone, onError, onStatus) {
+  samtbuPlayStart();
+  var lastApiCheck = 0, busy = false, finished = false;
+  var timer = setInterval(function() {
+    if (busy || finished) return; // én forespørsel om gangen, og aldri ferdig to ganger
+    var secs = Math.round((Date.now() - startTime) / 1000);
+    if (secs > 1200) { finished = true; clearInterval(timer); samtbuPlayFailure(); onError('timeout'); return; }
+    busy = true;
+    samtbuFetchBuildInfo().then(function(info) {
+      busy = false;
+      if (finished) return;
+      if (samtbuBuildHasCommit(info, repo, sha)) { finished = true; clearInterval(timer); samtbuPlaySuccess(); onDone(); return; }
+      onStatus(secs);
+      if (secs < 300 || Date.now() - lastApiCheck < 30000) return;
+      lastApiCheck = Date.now();
+      var tok = getStoredToken();
+      var h = { 'Accept': 'application/vnd.github+json' };
+      if (tok) h['Authorization'] = 'token ' + tok;
+      fetch('https://api.github.com/repos/SAMT-X/samt-bu-docs/actions/workflows/hugo.yml/runs?per_page=10', { headers: h, cache: 'no-store' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var runs = (data.workflow_runs || []).filter(function(run) {
+            return new Date(run.created_at).getTime() >= startTime - 30000;
+          });
+          if (!runs.length) return;
+          var active = runs.some(function(run) { return run.status !== 'completed'; });
+          var newest = runs[0];
+          if (!finished && !active && newest.conclusion !== 'success' && newest.conclusion !== 'cancelled') {
+            finished = true; clearInterval(timer); samtbuPlayFailure(); onError(newest.conclusion || 'failure');
+          }
+        })
+        .catch(function() {});
+    });
+  }, 2000);
+  return timer;
 }
 function samtbuClearPending() {
   try { localStorage.removeItem(SAMTBU_PENDING_KEY); } catch(e) {}
@@ -1159,8 +1216,50 @@ samtbuScheduleThanks();
 setTimeout(function() {
   var p = samtbuGetPending();
   if (!p || !p.count || !p.firstSaveAt) return;
-  if ((Date.now() - p.firstSaveAt) > 600000) { samtbuClearPending(); return; } // > 10 min – anta ferdig
+  if ((Date.now() - p.firstSaveAt) > 1200000) { samtbuClearPending(); return; } // > 20 min – anta ferdig
   samtbuShowPendingIndicator(p.count);
+
+  function onAllMineDone() {
+    samtbuClearPending();
+    samtbuShowDoneIndicator();
+    samtbuPlaySuccess('All your documentation jobs completed');
+    if (!samtbuHasVisibleDialog()) {
+      setTimeout(function() {
+        window.location.href = window.location.href.split('?')[0] + '?_=' + Date.now();
+      }, 1800);
+    }
+  }
+
+  // Commits lagret: sjekk mot byggkvitteringen, ikke GitHubs kjørestatus
+  if (p.commits && p.commits.length) {
+    var checkCommits = function() {
+      var p2 = samtbuGetPending();
+      if (!p2 || !p2.commits || !p2.commits.length) { clearInterval(commitTimer); return; }
+      samtbuFetchBuildInfo().then(function(info) {
+        if (!info) return;
+        var left = p2.commits.filter(function(c) { return !samtbuBuildHasCommit(info, c.repo, c.sha); });
+        if (!left.length) {
+          clearInterval(commitTimer);
+          onAllMineDone();
+        } else if (left.length < p2.commits.length) {
+          var done = p2.commits.length - left.length;
+          p2.commits = left;
+          p2.count = left.length;
+          try { localStorage.setItem(SAMTBU_PENDING_KEY, JSON.stringify(p2)); } catch(e) {}
+          samtbuShowPendingIndicator(left.length);
+          var completedWord = done === 1 ? 'One of your documentation jobs completed' : _numWord(done) + ' of your documentation jobs completed';
+          var remainingWord = left.length === 1 ? 'one remaining' : _numWord(left.length) + ' remaining';
+          samtbuPlaySuccess(completedWord + ', ' + remainingWord);
+        } else {
+          samtbuShowPendingIndicator(left.length);
+        }
+      });
+    };
+    checkCommits();
+    var commitTimer = setInterval(checkCommits, 3000);
+    return;
+  }
+
   var token = getStoredToken();
   var h = { 'Accept': 'application/vnd.github+json' };
   if (token) h['Authorization'] = 'token ' + token;
@@ -1823,7 +1922,7 @@ setTimeout(function() {
               npNewPageUrl = parentUrl + slug + '/';
             }
             showNpBuildPanel();
-            samtbuIncrementPending();
+            samtbuIncrementPending(npRepo, result && result.object && result.object.sha);
             npPollBuild(startTime);
           } else {
             setNpStatus(npLang === 'en' ? '\u2713 Pull request sent' : '\u2713 Pull request sendt');
@@ -2183,9 +2282,10 @@ setTimeout(function() {
       delPromise
         .then(function(result) {
           if (canWrite) {
+            var delSha = result && result.object && result.object.sha;
             showBuildPanel();
-            samtbuIncrementPending();
-            pollBuild(startTime);
+            samtbuIncrementPending(delRepo, delSha);
+            pollBuild(startTime, delSha);
           } else {
             showBuildPanel();
             document.getElementById('del-heading').textContent =
@@ -2320,21 +2420,44 @@ setTimeout(function() {
     window.location.href = url;
   }
 
-  function pollBuild(startTime) {
+  function pollBuild(startTime, sha) {
     var lang = delLang;
     var pageUrl = window.location.href.split('?')[0];
     var attempts = 0;
-
-    samtbuPlayStart();
 
     document.getElementById('del-panel-done').onclick = function() {
       clearInterval(activePollTimer); activePollTimer = null;
       navAfterDelete();
     };
 
-    function onDone() {
+    function setDelStatus(secs) {
+      var statusEl = document.getElementById('del-build-status-text');
+      if (statusEl) statusEl.textContent = lang === 'en' ? 'Updating site (' + secs + 's)…' : 'Nettsted oppdateres (' + secs + ' sek)…';
+    }
+
+    function onTimeout(reason) {
       clearInterval(activePollTimer); activePollTimer = null;
+      var statusEl = document.getElementById('del-build-status-text');
+      if (statusEl) statusEl.textContent = '⚠ ' + (reason && reason !== 'timeout' ? reason : (lang === 'en' ? 'Timed out' : 'Tidsavbrudd'));
+      var doneBtn = document.getElementById('del-panel-done');
+      if (doneBtn) doneBtn.style.display = 'inline-block';
+    }
+
+    if (sha) {
+      // Vent til commiten står i byggkvitteringen (/build.json)
+      activePollTimer = samtbuWaitForCommit(delRepo, sha, startTime, finish, onTimeout, setDelStatus);
+      return;
+    }
+
+    samtbuPlayStart();
+
+    function onDone() {
       samtbuPlaySuccess();
+      finish();
+    }
+
+    function finish() {
+      clearInterval(activePollTimer); activePollTimer = null;
       var doneBtn = document.getElementById('del-panel-done');
       if (doneBtn) doneBtn.style.display = 'inline-block';
       var secs = 3;
@@ -2350,22 +2473,11 @@ setTimeout(function() {
 
     // Poll nåværende side-URL – vent på 404 (siden forsvinner fra CF CDN)
     activePollTimer = setInterval(function() {
-      if (++attempts > 120) {
-        clearInterval(activePollTimer); activePollTimer = null;
-        var statusEl = document.getElementById('del-build-status-text');
-        if (statusEl) statusEl.textContent = '⚠ ' + (lang === 'en' ? 'Timed out' : 'Tidsavbrudd');
-        var doneBtn = document.getElementById('del-panel-done');
-        if (doneBtn) doneBtn.style.display = 'inline-block';
-        return;
-      }
+      if (++attempts > 120) { onTimeout(); return; }
       fetch(pageUrl + '?_cf=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
         .then(function(r) {
-          if (r.status === 404) {
-            onDone();
-          } else {
-            var statusEl = document.getElementById('del-build-status-text');
-            if (statusEl) statusEl.textContent = lang === 'en' ? 'Updating site (' + attempts + 's)…' : 'Nettsted oppdateres (' + attempts + ' sek)…';
-          }
+          if (r.status === 404) onDone();
+          else setDelStatus(attempts);
         })
         .catch(function() {});
     }, 1000);
@@ -2678,13 +2790,8 @@ setTimeout(function() {
     var startTime  = Date.now();
     var commitMsg  = (qeLang === 'en' ? 'Updated: ' : 'Oppdatert: ') + qePageTitle;
 
-    // Hent ETag for nåværende side async (best-effort) – brukes til å detektere deploy
-    var qeOldEtag = null;
-    fetch(qePermalink, { method: 'HEAD', cache: 'no-store' })
-      .then(function(r) { qeOldEtag = r.headers.get('etag') || r.headers.get('last-modified') || null; })
-      .catch(function() {});
-
-    function onSaveSuccess() {
+    function onSaveSuccess(ref) {
+      var sha = ref && ref.object && ref.object.sha;
       setStatus(qeLang === 'en' ? 'Saved! Updating site…' : 'Lagret! Nettstedet oppdateres…');
       saveBtn.disabled = true;
       saveBtn.textContent = qeLang === 'en' ? 'Saved' : 'Lagret';
@@ -2697,12 +2804,12 @@ setTimeout(function() {
       var w = document.getElementById('qe-build-warning');
       if (w) w.style.display = 'none';
       var _isModuleRepo = (qeRepo !== 'samt-bu-docs');
-      samtbuIncrementPending();
+      samtbuIncrementPending(qeRepo, sha);
       if (_isModuleRepo) {
         var _mp = samtbuGetPending();
         if (_mp) { _mp.moduleRepo = true; try { localStorage.setItem(SAMTBU_PENDING_KEY, JSON.stringify(_mp)); } catch(e) {} }
       }
-      pollQeBuild(startTime, qeOldEtag, _isModuleRepo);
+      pollQeBuild(startTime, sha);
     }
 
     function onPrSuccess(pr) {
@@ -2771,11 +2878,10 @@ setTimeout(function() {
     });
   });
 
-  function pollQeBuild(startTime, oldEtag, isModuleRepo) {
+  function pollQeBuild(startTime, sha) {
     if (qePollTimer) { clearInterval(qePollTimer); qePollTimer = null; }
     var lang = qeLang;
     var url = qePermalink;
-    var attempts = 0;
 
     function doNav() { window.location.href = url + '?_=' + Date.now(); }
 
@@ -2800,79 +2906,16 @@ setTimeout(function() {
       }
     }
 
-    if (oldEtag) {
-      samtbuPlayStart();
-      // ETag-deteksjon: vent til Cloudflare serverer ny versjon (same-origin HEAD-poll)
-      var _checkingApi = false;
-      qePollTimer = setInterval(function() {
-        if (++attempts > 180) {
-          if (_checkingApi) return; // Unngå parallelle API-kall
-          _checkingApi = true;
-          // Sjekk faktisk byggestatus – rapporter kun feil hvis GitHub bekrefter det
-          var _tok = getStoredToken();
-          var _h = { 'Accept': 'application/vnd.github+json' };
-          if (_tok) _h['Authorization'] = 'token ' + _tok;
-          fetch('https://api.github.com/repos/SAMT-X/samt-bu-docs/actions/workflows/hugo.yml/runs?per_page=5', { headers: _h })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-              _checkingApi = false;
-              var run = null;
-              if (data.workflow_runs) {
-                for (var i = 0; i < data.workflow_runs.length; i++) {
-                  if (new Date(data.workflow_runs[i].created_at).getTime() >= startTime - 30000) {
-                    run = data.workflow_runs[i]; break;
-                  }
-                }
-              }
-              if (!run) { clearInterval(qePollTimer); qePollTimer = null; samtbuPlayFailure(); setStatus('⚠ Tidsavbrudd'); return; }
-              if (run.status === 'in_progress' || run.status === 'queued') {
-                attempts = 0; // Bygg pågår – nullstill teller og fortsett ETag-poll
-              } else if (run.status === 'completed' && run.conclusion === 'success') {
-                clearInterval(qePollTimer); qePollTimer = null; samtbuPlaySuccess(); onBuildDone();
-              } else if (run.status === 'completed' && run.conclusion === 'cancelled') {
-                attempts = 0; setStatus(lang === 'en' ? 'Cancelled – waiting for new build…' : 'Avbrutt – venter på nytt bygg…');
-              } else {
-                clearInterval(qePollTimer); qePollTimer = null; samtbuPlayFailure(); setStatus('⚠ ' + (run.conclusion || 'Tidsavbrudd'));
-              }
-            })
-            .catch(function() { _checkingApi = false; clearInterval(qePollTimer); qePollTimer = null; samtbuPlayFailure(); setStatus('⚠ Tidsavbrudd'); });
-          return;
-        }
-        fetch(url + (url.indexOf('?') >= 0 ? '&' : '?') + '_cf=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
-          .then(function(r) {
-            var newEtag = r.headers.get('etag') || r.headers.get('last-modified');
-            if (r.ok && newEtag && newEtag !== oldEtag) {
-              if (!isModuleRepo) { samtbuPlaySuccess(); onBuildDone(); return; }
-              // Modul-repo-redigering: ETag kan ha endret seg fra en annen jobb. Verifiser
-              // at en repository_dispatch-kjøring faktisk er ferdig før vi erklærer done.
-              oldEtag = newEtag; // oppdater slik at neste poll ikke re-trigger sjekken
-              var _h2 = { 'Accept': 'application/vnd.github+json' };
-              var _tok2 = getStoredToken(); if (_tok2) _h2['Authorization'] = 'token ' + _tok2;
-              fetch('https://api.github.com/repos/SAMT-X/samt-bu-docs/actions/workflows/hugo.yml/runs?per_page=5&event=repository_dispatch', { headers: _h2, cache: 'no-store' })
-                .then(function(r2) { return r2.json(); })
-                .then(function(d2) {
-                  var ok = false;
-                  if (d2.workflow_runs) {
-                    for (var j = 0; j < d2.workflow_runs.length; j++) {
-                      var dr = d2.workflow_runs[j];
-                      if (new Date(dr.created_at).getTime() >= startTime - 30000 && dr.status === 'completed' && dr.conclusion === 'success') { ok = true; break; }
-                    }
-                  }
-                  if (ok) { samtbuPlaySuccess(); onBuildDone(); }
-                  // else: fortsett polling – neste ETag-endring er trolig vår dispatch-jobb
-                })
-                .catch(function() { samtbuPlaySuccess(); onBuildDone(); }); // fail-safe: gå videre ved API-feil
-            } else setStatus(lang === 'en' ? 'Updating site (' + attempts + 's)…' : 'Nettsted oppdateres (' + attempts + ' sek)…');
-          })
-          .catch(function() { setStatus('Venter…'); });
-      }, 1000);
+    function onError(reason) { clearInterval(qePollTimer); qePollTimer = null; setStatus('⚠ ' + reason); }
+
+    if (sha) {
+      // Vent til commiten står i byggkvitteringen (/build.json) – virker også for modulrepoer
+      qePollTimer = samtbuWaitForCommit(qeRepo, sha, startTime, onBuildDone, onError, function(secs) {
+        setStatus(lang === 'en' ? 'Updating site (' + secs + 's)…' : 'Nettsted oppdateres (' + secs + ' sek)…');
+      });
     } else {
-      // Fallback: GitHub Actions API (2s intervall)
-      qePollTimer = startGhPoll(startTime,
-        onBuildDone,
-        function onError(reason) { clearInterval(qePollTimer); qePollTimer = null; setStatus('⚠ ' + reason); },
-        function onStatus(msg) { setStatus(msg); }
-      );
+      // Reserve uten SHA: GitHub Actions API (2s intervall)
+      qePollTimer = startGhPoll(startTime, onBuildDone, onError, function(msg) { setStatus(msg); });
     }
   }
 
@@ -3777,10 +3820,19 @@ setTimeout(function() {
     if (_historyMode === 'mine' && login) url += '&actor=' + encodeURIComponent(login);
     var headers = { 'Accept': 'application/vnd.github+json' };
     if (token) headers['Authorization'] = 'token ' + token;
-    fetch(url, { headers: headers, cache: 'no-store' })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        _historyRuns = data.workflow_runs || [];
+    Promise.all([fetch(url, { headers: headers, cache: 'no-store' }).then(function(r) { return r.json(); }), samtbuFetchBuildInfo()])
+      .then(function(res) {
+        var info = res[1];
+        // GitHub kan melde kjøringer ferdige minutter for sent. Kjøringene går én om gangen
+        // i rekkefølge, så alt til og med kjøringen i byggkvitteringen er publisert.
+        _historyRuns = (res[0].workflow_runs || []).map(function(run) {
+          if (!info || !info.run_id || run.id > info.run_id) return run;
+          if (run.id === info.run_id) {
+            return Object.assign({}, run, { status: 'completed', conclusion: 'success', updated_at: info.built_at });
+          }
+          if (run.status !== 'completed') return Object.assign({}, run, { status: 'completed', conclusion: 'success' });
+          return run;
+        });
         renderHistory(_historyRuns);
       })
       .catch(function(err) {
@@ -3999,7 +4051,7 @@ function _mvMsg(text, isError) {
   el.textContent = text;
 }
 
-function _mvOpenBuildDialog(startTime, sourcePerm, isEn, oldEtag) {
+function _mvOpenBuildDialog(startTime, sourcePerm, isEn, oldEtag, repo, sha) {
   var overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;';
   var dlg = document.createElement('div');
@@ -4035,7 +4087,7 @@ function _mvOpenBuildDialog(startTime, sourcePerm, isEn, oldEtag) {
   overlay.appendChild(dlg);
   document.body.appendChild(overlay);
 
-  samtbuIncrementPending();
+  samtbuIncrementPending(repo, sha);
   var timer;
 
   function onBuildDone() {
@@ -4052,8 +4104,14 @@ function _mvOpenBuildDialog(startTime, sourcePerm, isEn, oldEtag) {
     statusEl.textContent = '⚠ ' + (reason || 'Feil');
   }
 
-  if (oldEtag) {
-    // ETag-basert polling – identisk logikk som pollQeBuild (inkl. GH Actions-fallback etter 180s)
+  if (sha) {
+    // Vent til commiten står i byggkvitteringen (/build.json)
+    timer = samtbuWaitForCommit(repo, sha, startTime, onBuildDone, onBuildError, function(secs) {
+      if (!overlay.isConnected) { clearInterval(timer); return; }
+      statusEl.textContent = isEn ? 'Updating site (' + secs + 's)…' : 'Nettstedet oppdateres (' + secs + ' sek)…';
+    });
+  } else if (oldEtag) {
+    // ETag-basert polling med GH Actions-reserve etter 180s
     samtbuPlayStart();
     var attempts = 0;
     var _checking = false;
@@ -4177,11 +4235,11 @@ function _mvDoHit(position) {
     if(nbNew===nbRaw)throw new Error('weight-felt ikke funnet i nb-fil');
     if(enNew===enRaw)throw new Error('weight-felt ikke funnet i en-fil');
     var dir=mvDirPath.replace(/^content\//,'');
-    return _mvCommit(token,mvRepo,[{path:nbPath,content:nbNew},{path:enPath,content:enNew}],'Flytt kapittel: ny vekt '+newWeight+(dir?' ('+dir+')':'')).then(function(){return sourceEtag;});
-  }).then(function(sourceEtag){
+    return _mvCommit(token,mvRepo,[{path:nbPath,content:nbNew},{path:enPath,content:enNew}],'Flytt kapittel: ny vekt '+newWeight+(dir?' ('+dir+')':'')).then(function(ref){return {etag:sourceEtag, sha:ref&&ref.object&&ref.object.sha};});
+  }).then(function(res){
     _mvClear();
     _mvRestoreMenu();  // Fjern dialog + reaktiver Endre-knapp
-    _mvOpenBuildDialog(startTime, state.permalink, isEn, sourceEtag);
+    _mvOpenBuildDialog(startTime, state.permalink, isEn, res.etag, mvRepo, res.sha);
   }).catch(function(err){
     _mvMsg((isEn?'⚠ Error: ':'⚠ Feil: ')+err.message,true);
   });
