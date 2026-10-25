@@ -854,7 +854,11 @@ function samtbuWaitForCommit(repo, sha, startTime, onDone, onError, onStatus) {
           var active = runs.some(function(run) { return run.status !== 'completed'; });
           var newest = runs[0];
           if (!finished && !active && newest.conclusion !== 'success' && newest.conclusion !== 'cancelled') {
-            finished = true; clearInterval(timer); samtbuPlayFailure(); onError(newest.conclusion || 'failure');
+            // Bygget kan ha tatt med andres endringer – feilen trenger ikke være brukerens egen
+            var failMsg = document.documentElement.lang === 'en'
+              ? 'The build failed (possibly caused by another change in the same build). See the build history at the bottom left.'
+              : 'Bygget feilet (kan skyldes en annen endring i samme bygg). Se byggehistorikken nede til venstre.';
+            finished = true; clearInterval(timer); samtbuPlayFailure(); onError(failMsg);
           }
         })
         .catch(function() {});
