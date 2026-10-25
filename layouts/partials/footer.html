@@ -265,7 +265,9 @@
           fetch('https://api.github.com/users/' + login)
             .then(function(r) { return r.json(); })
             .then(function(d) {
-              if (d.name) editorEl.textContent = 'av bruker: ' + login + ' (' + d.name + ')';
+              // Bare navnet byttes; etiketten («av bruker:»/«by») kommer fra i18n i malen
+              var nameEl = editorEl.querySelector('.page-meta-editor') || editorEl;
+              if (d.name) nameEl.textContent = login + ' (' + d.name + ')';
             })
             .catch(function() {});
         }
