@@ -341,9 +341,11 @@ function samtbuLogoutNotice() {
    skyldes en annen endring enn brukerens egen – og da kommer endringen først ut
    når feilen er rettet. Til det er løst (solution-samt-bu-docs#83) sier vi det
    rett ut og lar brukeren melde fra. Køen tømmes, så meldingen kommer én gang.
-   Boksen blir stående til brukeren lukker den. */
+   Boksen blir stående til brukeren lukker den.
+   setAside: filer fra brukerens commit som bygget satte til side. Da er resten av
+   nettstedet publisert, men akkurat denne endringen ikke (samtbuSetAsideFor). */
 var SAMTBU_BUILD_FAILURE_ISSUE = 'https://github.com/samt-x/solution-samt-bu-docs/issues/83';
-function samtbuReportBuildFailed() {
+function samtbuReportBuildFailed(setAside) {
   var en = document.documentElement.lang === 'en';
   samtbuPlayFailure();
   samtbuClearPending();
@@ -371,11 +373,20 @@ function samtbuReportBuildFailed() {
 
   var p2 = document.createElement('p');
   p2.style.cssText = 'margin:0 0 .7rem; font-size:13px; color:#445;';
-  p2.textContent = en
-    ? 'The build that should have published it failed. This may be caused by another change in the same build, not yours. ' +
-      'If so, your change will be published once that is fixed. This is a known, rare problem that we are working on.'
-    : 'Bygget som skulle publisere den, feilet. Det kan skyldes en annen endring i samme bygg, ikke din. ' +
-      'I så fall publiseres endringen din når feilen er rettet. Dette er et kjent, sjeldent problem som vi jobber med å løse.';
+  if (setAside && setAside.length) {
+    p.textContent = en ? 'Your change could not be published.' : 'Endringen din kunne ikke publiseres.';
+    p2.textContent = en
+      ? 'The page could not be built with your change, so the previous version is still shown. The rest of the site is updated. ' +
+        'The error is reported automatically, but you are welcome to add a comment. File: ' + setAside.join(', ')
+      : 'Siden kunne ikke bygges med endringen din, så forrige versjon vises fortsatt. Resten av nettstedet er oppdatert. ' +
+        'Feilen er meldt fra om automatisk, men du kan gjerne skrive en kommentar. Fil: ' + setAside.join(', ');
+  } else {
+    p2.textContent = en
+      ? 'The build that should have published it failed. This may be caused by another change in the same build, not yours. ' +
+        'If so, your change will be published once that is fixed. This is a known, rare problem that we are working on.'
+      : 'Bygget som skulle publisere den, feilet. Det kan skyldes en annen endring i samme bygg, ikke din. ' +
+        'I så fall publiseres endringen din når feilen er rettet. Dette er et kjent, sjeldent problem som vi jobber med å løse.';
+  }
 
   var row = document.createElement('div');
   row.style.cssText = 'display:flex; gap:.6rem; justify-content:flex-end; align-items:center;';
@@ -910,6 +921,29 @@ function samtbuBuildHasCommit(info, repo, sha) {
   var list = info && info.repos && info.repos[String(repo).toLowerCase()];
   return !!(list && sha && list.indexOf(sha) !== -1);
 }
+// Filer fra commitene som bygget satte til side (info.set_aside, solution-samt-bu-docs#83).
+// Spør GitHub om commitens filer bare når repoet har noe satt til side – det er sjeldent.
+function samtbuSetAsideFor(info, commits) {
+  var aside = (info && info.set_aside) || [];
+  var hit = commits.filter(function(c) {
+    return aside.some(function(s) { return s.repo === String(c.repo).toLowerCase(); });
+  });
+  if (!hit.length) return Promise.resolve([]);
+  var tok = getStoredToken();
+  var h = { 'Accept': 'application/vnd.github+json' };
+  if (tok) h['Authorization'] = 'token ' + tok;
+  return Promise.all(hit.map(function(c) {
+    return fetch('https://api.github.com/repos/SAMT-X/' + c.repo + '/commits/' + c.sha, { headers: h, cache: 'no-store' })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(data) {
+        var files = ((data && data.files) || []).map(function(f) { return f.filename; });
+        return aside.filter(function(s) {
+          return s.repo === String(c.repo).toLowerCase() && files.indexOf(s.path) !== -1;
+        }).map(function(s) { return s.path; });
+      })
+      .catch(function() { return []; });
+  })).then(function(lists) { return [].concat.apply([], lists); });
+}
 
 // Vent til commiten er publisert. onStatus får antall sekunder siden start.
 // Etter 5 min spørres GitHub hvert 30. sek om bygget har feilet; etter 20 min gis det opp.
@@ -924,7 +958,18 @@ function samtbuWaitForCommit(repo, sha, startTime, onDone, onError, onStatus) {
     samtbuFetchBuildInfo().then(function(info) {
       busy = false;
       if (finished) return;
-      if (samtbuBuildHasCommit(info, repo, sha)) { finished = true; clearInterval(timer); samtbuSettlePending(info); onDone(); return; }
+      if (samtbuBuildHasCommit(info, repo, sha)) {
+        finished = true; clearInterval(timer);
+        samtbuSetAsideFor(info, [{ repo: repo, sha: sha }]).then(function(paths) {
+          if (paths.length) {
+            samtbuReportBuildFailed(paths);
+            onError(document.documentElement.lang === 'en' ? 'Your change could not be published – see the message at the bottom right.' : 'Endringen kunne ikke publiseres – se meldingen nede til høyre.');
+            return;
+          }
+          samtbuSettlePending(info); onDone();
+        });
+        return;
+      }
       onStatus(secs);
       if (secs < 300 || Date.now() - lastApiCheck < 30000) return;
       lastApiCheck = Date.now();
@@ -1352,11 +1397,21 @@ setTimeout(function() {
   // samtbuSettlePending gir ett signal når alle er ute, ingen mellomsignaler.
   if (p.commits && p.commits.length) {
     var lastFailCheck = 0;
+    var checking = false; // én runde om gangen – ellers kan meldingen komme to ganger
     var checkCommits = function() {
       var p2 = samtbuGetPending();
       if (!p2 || !p2.commits || !p2.commits.length) { clearInterval(commitTimer); return; }
+      if (checking) return;
+      checking = true;
       samtbuFetchBuildInfo().then(function(info) {
-        if (!info) return;
+        if (!info) return null;
+        var published = p2.commits.filter(function(c) { return samtbuBuildHasCommit(info, c.repo, c.sha); });
+        return samtbuSetAsideFor(info, published).then(function(paths) { return { info: info, paths: paths }; });
+      }).then(function(res) {
+        checking = false;
+        if (!res || !samtbuGetPending()) return;
+        var info = res.info;
+        if (res.paths.length) { clearInterval(commitTimer); samtbuReportBuildFailed(res.paths); return; }
         samtbuSettlePending(info);
         if (!samtbuGetPending()) { clearInterval(commitTimer); reloadWhenQuiet(); return; }
         // Lar commitene vente på seg (> 5 min etter siste lagring): sjekk om bygget har feilet
