@@ -103,11 +103,12 @@
       </a>
       {{ if ne $numberOfPages 0 }}
         <ul>
-          {{ .Scratch.Set "pages" .Pages }}
+          {{/* Lokal variabel, ikke .Scratch: seksjonens .Scratch deles av alle sider som bygges samtidig,
+               og ga av og til feil undermeny (Styrings barn under Prosjektleveranser, 2026-10-26) */}}
+          {{ $pages := .Pages }}
           {{ if .Sections}}
-          {{ .Scratch.Set "pages" (.Pages | union .Sections) }}
+          {{ $pages = .Pages | union .Sections }}
           {{end}}
-          {{ $pages := (.Scratch.Get "pages") }}
 
         {{if eq .Site.Params.ordersectionsby "title"}}
           {{ range $pages.ByTitle }}
