@@ -1104,7 +1104,7 @@ function _numWord(n) {
 function samtbuPlaySuccess(speechText) {
   // C5–E5–G5–C6, siste tone lang for avslutningseffekt
   var ms = _samtbuPlayNotes([[523,0,0.22],[659,0.25,0.22],[784,0.50,0.22],[1047,0.75,0.60]]);
-  _samtbuSpeak(speechText || 'All your documentation jobs completed', ms + 150);
+  _samtbuSpeak(speechText || 'Your updated documentation is now online', ms + 150);
 }
 
 // En egen commit er publisert: fjern det som er ute fra køen. Er køen tom, spill
@@ -1332,7 +1332,7 @@ setTimeout(function() {
           clearInterval(resumeTimer);
           samtbuClearPending();
           samtbuShowDoneIndicator();
-          var doneSpeech = 'All your documentation jobs completed';
+          var doneSpeech = 'Your updated documentation is now online';
           if (othersActive > 0) {
             doneSpeech += ', ' + _numWord(othersActive) + ' other update ' + (othersActive === 1 ? 'job' : 'jobs') + ' in progress';
           }
