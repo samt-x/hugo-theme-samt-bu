@@ -337,6 +337,93 @@ function samtbuLogoutNotice() {
   }, 10000);
 }
 
+/* Feilet bygg med brukerens endring. Bygget tar med alt i main, så feilen kan
+   skyldes en annen endring enn brukerens egen – og da kommer endringen først ut
+   når feilen er rettet. Til det er løst (solution-samt-bu-docs#83) sier vi det
+   rett ut og lar brukeren melde fra. Køen tømmes, så meldingen kommer én gang.
+   Boksen blir stående til brukeren lukker den. */
+var SAMTBU_BUILD_FAILURE_ISSUE = 'https://github.com/samt-x/solution-samt-bu-docs/issues/83';
+function samtbuReportBuildFailed() {
+  var en = document.documentElement.lang === 'en';
+  samtbuPlayFailure();
+  samtbuClearPending();
+  var ind = document.getElementById('qe-job-indicator');
+  if (ind) {
+    ind.textContent = en ? '⚠ Build failed' : '⚠ Bygget feilet';
+    ind.removeAttribute('data-building');
+    ind.style.display = 'flex';
+  }
+  var old = document.getElementById('samt-bu-build-failed-notice');
+  if (old) old.remove();
+
+  var box = document.createElement('div');
+  box.id = 'samt-bu-build-failed-notice';
+  box.style.cssText = 'position:fixed; bottom:44px; right:24px; z-index:999999;' +
+    ' background:#fff; color:#222; border:1px solid #e8d0d0; border-left:4px solid #b00020;' +
+    ' padding:.85rem 1.1rem; border-radius:5px; font-size:14px; line-height:1.5;' +
+    ' box-shadow:0 4px 18px rgba(0,0,0,.22); max-width:380px; font-family:inherit;';
+
+  var p = document.createElement('p');
+  p.style.cssText = 'margin:0 0 .7rem; font-weight:bold;';
+  p.textContent = en
+    ? 'Your change is not online yet.'
+    : 'Endringen din er ikke publisert ennå.';
+
+  var p2 = document.createElement('p');
+  p2.style.cssText = 'margin:0 0 .7rem; font-size:13px; color:#445;';
+  p2.textContent = en
+    ? 'The build that should have published it failed. This may be caused by another change in the same build, not yours. ' +
+      'If so, your change will be published once that is fixed. This is a known, rare problem that we are working on.'
+    : 'Bygget som skulle publisere den, feilet. Det kan skyldes en annen endring i samme bygg, ikke din. ' +
+      'I så fall publiseres endringen din når feilen er rettet. Dette er et kjent, sjeldent problem som vi jobber med å løse.';
+
+  var row = document.createElement('div');
+  row.style.cssText = 'display:flex; gap:.6rem; justify-content:flex-end; align-items:center;';
+
+  var dismiss = document.createElement('button');
+  dismiss.type = 'button';
+  dismiss.textContent = 'OK';
+  dismiss.style.cssText = 'padding:.35rem 1rem; border:1px solid #ccc; border-radius:4px;' +
+    ' background:#fff; cursor:pointer; font-size:13px; font-family:inherit;';
+  dismiss.addEventListener('click', function() { box.remove(); });
+
+  var report = document.createElement('a');
+  report.href = SAMTBU_BUILD_FAILURE_ISSUE;
+  report.target = '_blank';
+  report.rel = 'noopener';
+  report.textContent = en ? 'Report it here' : 'Meld fra her';
+  report.title = en ? 'Add a comment on the issue in GitHub' : 'Skriv en kommentar på saken i GitHub';
+  report.style.cssText = 'padding:.35rem 1rem; border:none; border-radius:4px; background:#b00020;' +
+    ' color:#fff; cursor:pointer; font-size:13px; font-family:inherit; text-decoration:none;';
+
+  row.appendChild(dismiss);
+  row.appendChild(report);
+  box.appendChild(p);
+  box.appendChild(p2);
+  box.appendChild(row);
+  document.body.appendChild(box);
+}
+
+// Sjekk om byggene siden «since» har feilet: ingen kjører, og det nyeste feilet.
+// Kalles bare når commiten har latt vente på seg (> 5 min), og høyst hvert 30. sek.
+function samtbuCheckBuildFailed(since, onFailed) {
+  var tok = getStoredToken();
+  var h = { 'Accept': 'application/vnd.github+json' };
+  if (tok) h['Authorization'] = 'token ' + tok;
+  fetch('https://api.github.com/repos/SAMT-X/samt-bu-docs/actions/workflows/hugo.yml/runs?per_page=10', { headers: h, cache: 'no-store' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var runs = (data.workflow_runs || []).filter(function(run) {
+        return new Date(run.created_at).getTime() >= since - 30000;
+      });
+      if (!runs.length) return;
+      var active = runs.some(function(run) { return run.status !== 'completed'; });
+      var newest = runs[0];
+      if (!active && newest.conclusion !== 'success' && newest.conclusion !== 'cancelled') onFailed();
+    })
+    .catch(function() {});
+}
+
 // Hent og cache innlogget GitHub-brukernavn
 function fetchCurrentUser(callback) {
   var cached = localStorage.getItem('samt-bu-gh-user');
@@ -841,27 +928,12 @@ function samtbuWaitForCommit(repo, sha, startTime, onDone, onError, onStatus) {
       onStatus(secs);
       if (secs < 300 || Date.now() - lastApiCheck < 30000) return;
       lastApiCheck = Date.now();
-      var tok = getStoredToken();
-      var h = { 'Accept': 'application/vnd.github+json' };
-      if (tok) h['Authorization'] = 'token ' + tok;
-      fetch('https://api.github.com/repos/SAMT-X/samt-bu-docs/actions/workflows/hugo.yml/runs?per_page=10', { headers: h, cache: 'no-store' })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          var runs = (data.workflow_runs || []).filter(function(run) {
-            return new Date(run.created_at).getTime() >= startTime - 30000;
-          });
-          if (!runs.length) return;
-          var active = runs.some(function(run) { return run.status !== 'completed'; });
-          var newest = runs[0];
-          if (!finished && !active && newest.conclusion !== 'success' && newest.conclusion !== 'cancelled') {
-            // Bygget kan ha tatt med andres endringer – feilen trenger ikke være brukerens egen
-            var failMsg = document.documentElement.lang === 'en'
-              ? 'The build failed (possibly caused by another change in the same build). See the build history at the bottom left.'
-              : 'Bygget feilet (kan skyldes en annen endring i samme bygg). Se byggehistorikken nede til venstre.';
-            finished = true; clearInterval(timer); samtbuPlayFailure(); onError(failMsg);
-          }
-        })
-        .catch(function() {});
+      samtbuCheckBuildFailed(startTime, function() {
+        if (finished) return;
+        finished = true; clearInterval(timer);
+        samtbuReportBuildFailed();
+        onError(document.documentElement.lang === 'en' ? 'The build failed – see the message at the bottom right.' : 'Bygget feilet – se meldingen nede til høyre.');
+      });
     });
   }, 2000);
   return timer;
@@ -1279,13 +1351,22 @@ setTimeout(function() {
   // Commits lagret: sjekk mot byggkvitteringen, ikke GitHubs kjørestatus.
   // samtbuSettlePending gir ett signal når alle er ute, ingen mellomsignaler.
   if (p.commits && p.commits.length) {
+    var lastFailCheck = 0;
     var checkCommits = function() {
       var p2 = samtbuGetPending();
       if (!p2 || !p2.commits || !p2.commits.length) { clearInterval(commitTimer); return; }
       samtbuFetchBuildInfo().then(function(info) {
         if (!info) return;
         samtbuSettlePending(info);
-        if (!samtbuGetPending()) { clearInterval(commitTimer); reloadWhenQuiet(); }
+        if (!samtbuGetPending()) { clearInterval(commitTimer); reloadWhenQuiet(); return; }
+        // Lar commitene vente på seg (> 5 min etter siste lagring): sjekk om bygget har feilet
+        if (Date.now() - p2.lastSaveAt < 300000 || Date.now() - lastFailCheck < 30000) return;
+        lastFailCheck = Date.now();
+        samtbuCheckBuildFailed(p2.lastSaveAt, function() {
+          if (!samtbuGetPending()) return;
+          clearInterval(commitTimer);
+          samtbuReportBuildFailed();
+        });
       });
     };
     checkCommits();
