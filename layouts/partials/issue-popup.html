@@ -46,6 +46,16 @@
     document.body.appendChild(box);
     box.querySelector('.sip-close').addEventListener('click', function () { box.style.display = 'none'; });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') box.style.display = 'none'; });
+    // Lukke ved klikk på et sted som ikke er klikkbart. Musa må også ha gått ned utenfor vinduet,
+    // ellers lukker det seg når en flytting eller endring av størrelse slippes utenfor.
+    var downInside = false;
+    document.addEventListener('pointerdown', function (e) { downInside = box.contains(e.target); }, true);
+    document.addEventListener('click', function (e) {
+      if (box.style.display !== 'flex' || downInside || box.contains(e.target)) return;
+      if (e.target.closest && e.target.closest('a, button, input, select, textarea, label, summary, [role="button"]')) return;
+      if (String(window.getSelection())) return;   // markering av tekst er ikke et klikk
+      box.style.display = 'none';
+    });
     // Flytte: dra i tittellinjen
     var head = box.querySelector('.sip-head'), sx, sy, bx, by;
     head.addEventListener('pointerdown', function (e) {
