@@ -1,11 +1,13 @@
 {{- /* Limer en SVG fra sidens mappe rett inn i siden, så lenker og verktøytips i figuren virker.
      Bruk: {{< inline-svg "project-5-nb.svg" >}}. Figuren skaleres til spaltebredden, men ikke under
      900 px; i smalere spalter rulles den sidelengs. Figuren må ha viewBox.
+     Lenker til GitHub-issues i figuren åpnes i et flyttbart vindu (partials/issue-popup.html).
      Laget for tidslinjen i oppgavestyringen (solution-task-management#32). */ -}}
 {{- $name := .Get 0 -}}
 {{- with .Page.Resources.Get $name -}}
 <style>.samtbu-inline-svg{overflow-x:auto;max-width:100%;margin:0 0 1rem 0}.samtbu-inline-svg>svg{width:100%;height:auto;min-width:900px}</style>
 <div class="samtbu-inline-svg">{{ .Content | safeHTML }}</div>
+{{- partial "issue-popup.html" $.Page -}}
 {{- else -}}
 {{- warnf "inline-svg: fant ikke %q ved %s" $name .Page.File.Path -}}
 <p><em>Figuren {{ $name }} mangler.</em></p>

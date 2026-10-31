@@ -1,0 +1,127 @@
+{{- /* Vindu over figuren for issue-lenker i SVG-er som er limt inn med shortcoden inline-svg
+     (solution-task-management#32). Klikk på en lenke til et GitHub-issue henter issuet fra GitHubs API
+     og viser det i et vindu som kan flyttes (tittellinjen) og endres i størrelse (hjørnet nede til høyre).
+     Ctrl-, Cmd-, Shift- og midtklikk åpner GitHub som før. Lenker med class tl-dep (pilene i tidslinjen)
+     viser i tillegg verktøytipset sitt øverst. GitHub kan ikke vises i iframe, derfor API-et.
+     Token: getStoredToken() hvis brukeren er innlogget, ellers uten (60 oppslag i timen per IP).
+     Tas med én gang per side av inline-svg; window.samtbuIssuePopupInit hindrer dobbel oppstart. */ -}}
+{{- $en := eq .Language.Lang "en" -}}
+<style>
+#samtbu-issue-popup{position:fixed;z-index:10000;width:560px;height:460px;min-width:300px;min-height:180px;max-width:95vw;max-height:90vh;
+  resize:both;overflow:hidden;display:none;flex-direction:column;background:#fff;border:1px solid #d0d7de;border-radius:8px;
+  box-shadow:0 8px 24px rgba(31,35,40,.25);font-size:14px;color:#1f2328}
+#samtbu-issue-popup .sip-head{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f6f8fa;border-bottom:1px solid #d0d7de;
+  cursor:move;user-select:none;border-radius:8px 8px 0 0}
+#samtbu-issue-popup .sip-title{flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#samtbu-issue-popup .sip-close{border:0;background:none;font-size:20px;line-height:1;cursor:pointer;color:#57606a;padding:0 4px}
+#samtbu-issue-popup .sip-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:10px 14px}
+#samtbu-issue-popup .sip-meta{color:#57606a;font-size:12px;margin-bottom:8px}
+#samtbu-issue-popup .sip-state{display:inline-block;padding:1px 8px;border-radius:10px;color:#fff;font-size:12px;margin-right:6px}
+#samtbu-issue-popup .sip-dep{white-space:pre-line;background:#fff8c5;border:1px solid #d4a72c;border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:13px}
+#samtbu-issue-popup .sip-text{overflow-wrap:anywhere}
+#samtbu-issue-popup .sip-text img{max-width:100%}
+#samtbu-issue-popup .sip-text h3{font-size:15px;margin:12px 0 4px}
+#samtbu-issue-popup .sip-foot{padding:6px 14px;border-top:1px solid #d0d7de;font-size:12px}
+</style>
+<script>
+(function () {
+  if (window.samtbuIssuePopupInit) return;
+  window.samtbuIssuePopupInit = true;
+  var T = {{ if $en }}{open: 'Open on GitHub', loading: 'Loading …', close: 'Close', opened: 'Open', closed: 'Closed',
+           fail: 'Could not fetch the task from GitHub (the limit for anonymous lookups may be reached – log in to raise it).',
+           comments: 'comments', nobody: 'no assignee'}
+          {{ else }}{open: 'Åpne på GitHub', loading: 'Henter …', close: 'Lukk', opened: 'Åpen', closed: 'Lukket',
+           fail: 'Kunne ikke hente oppgaven fra GitHub (grensen for oppslag uten innlogging kan være nådd – logg inn for å heve den).',
+           comments: 'kommentarer', nobody: 'ingen ansvarlig'}{{ end }};
+  var cache = {}, box = null;
+
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+
+  function build() {
+    box = document.createElement('div');
+    box.id = 'samtbu-issue-popup';
+    box.innerHTML = '<div class="sip-head"><span class="sip-title"></span>' +
+      '<button class="sip-close" type="button" title="' + T.close + '" aria-label="' + T.close + '">×</button></div>' +
+      '<div class="sip-body"></div><div class="sip-foot"></div>';
+    document.body.appendChild(box);
+    box.querySelector('.sip-close').addEventListener('click', function () { box.style.display = 'none'; });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') box.style.display = 'none'; });
+    // Flytte: dra i tittellinjen
+    var head = box.querySelector('.sip-head'), sx, sy, bx, by;
+    head.addEventListener('pointerdown', function (e) {
+      if (e.target.closest('.sip-close')) return;
+      sx = e.clientX; sy = e.clientY; bx = box.offsetLeft; by = box.offsetTop;
+      head.setPointerCapture(e.pointerId);
+    });
+    head.addEventListener('pointermove', function (e) {
+      if (!head.hasPointerCapture(e.pointerId)) return;
+      box.style.left = Math.max(0, Math.min(window.innerWidth - 80, bx + e.clientX - sx)) + 'px';
+      box.style.top = Math.max(0, Math.min(window.innerHeight - 40, by + e.clientY - sy)) + 'px';
+    });
+  }
+
+  function place(e) {
+    if (box.style.display === 'flex') return;   // åpent vindu blir der brukeren har lagt det
+    // 48 px luft nederst: bunnlinjen på nettstedet ligger fast der
+    // Standardstørrelse bare første gang; deretter beholdes størrelsen brukeren har dratt til
+    if (!box.style.width) {
+      box.style.width = '560px';
+      box.style.height = Math.min(460, window.innerHeight - 64) + 'px';
+    }
+    var w = parseInt(box.style.width, 10), h = parseInt(box.style.height, 10);
+    box.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, e.clientX + 16)) + 'px';
+    box.style.top = Math.max(8, Math.min(window.innerHeight - h - 48, e.clientY - 40)) + 'px';
+  }
+
+  function render(url, dep, issue) {
+    var body = box.querySelector('.sip-body');
+    var head = dep ? '<div class="sip-dep">' + esc(dep) + '</div>' : '';
+    if (!issue) {
+      body.innerHTML = head + '<p>' + T.fail + '</p>';
+      return;
+    }
+    box.querySelector('.sip-title').textContent = '#' + issue.number + ' ' + issue.title;
+    var open = issue.state === 'open';
+    var who = (issue.assignees || []).map(function (a) { return '@' + a.login; }).join(', ') || T.nobody;
+    var labels = (issue.labels || []).map(function (l) { return esc(l.name); }).join(', ');
+    var type = issue.type && issue.type.name ? esc(issue.type.name) + ' · ' : '';
+    body.innerHTML = head +
+      '<div class="sip-meta"><span class="sip-state" style="background:' + (open ? '#1a7f37' : '#8250df') + '">' +
+      (open ? T.opened : T.closed) + '</span>' + type + esc(who) + (labels ? ' · ' + labels : '') +
+      ' · ' + issue.comments + ' ' + T.comments + '</div>' +
+      // body_html er GitHubs egen, rensede gjengivelse av markdown
+      '<div class="sip-text">' + (issue.body_html || '') + '</div>';
+  }
+
+  function show(e, url, dep) {
+    if (!box) build();
+    place(e);
+    box.style.display = 'flex';
+    box.querySelector('.sip-title').textContent = url.replace('https://github.com/', '');
+    box.querySelector('.sip-body').innerHTML = (dep ? '<div class="sip-dep">' + esc(dep) + '</div>' : '') + '<p>' + T.loading + '</p>';
+    box.querySelector('.sip-foot').innerHTML = '<a href="' + esc(url) + '" target="_blank" rel="noopener">' + T.open + '</a>';   // temaet legger selv ↗ på eksterne lenker
+    if (cache[url]) { render(url, dep, cache[url]); return; }
+    var m = url.match(/github\.com\/([^\/]+)\/([^\/]+)\/issues\/(\d+)/);
+    var headers = {Accept: 'application/vnd.github.html+json'};
+    var token = typeof getStoredToken === 'function' ? getStoredToken() : null;
+    if (token) headers.Authorization = 'Bearer ' + token;
+    fetch('https://api.github.com/repos/' + m[1] + '/' + m[2] + '/issues/' + m[3], {headers: headers})
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (issue) { cache[url] = issue; render(url, dep, issue); })
+      .catch(function () { render(url, dep, null); });
+  }
+
+  document.addEventListener('click', function (e) {
+    // Lenker i figuren, og lenker til andre issues inne i vinduet (f.eks. under Avhengigheter)
+    var a = e.target.closest && e.target.closest('.samtbu-inline-svg a, #samtbu-issue-popup .sip-text a');
+    if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+    var url = a.getAttribute('href') || a.getAttribute('xlink:href') || '';
+    if (!/^https:\/\/github\.com\/[^\/]+\/[^\/]+\/issues\/\d+/.test(url)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var t = a.classList.contains('tl-dep') && a.querySelector('title');
+    // Siste linje i verktøytipset er «Klikk for å åpne …», som ikke gir mening inne i vinduet
+    show(e, url, t ? t.textContent.split('\n').slice(0, -1).join('\n') : '');
+  }, true);
+})();
+</script>
