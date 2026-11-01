@@ -22,7 +22,8 @@
 .samtbu-isvg-bar button:hover{background:#eaeef2}
 .samtbu-isvg-bar .samtbu-isvg-level{min-width:3.5em;text-align:center;color:#57606a}
 .samtbu-isvg-bar a{margin-left:.5rem}
-.samtbu-inline-svg{overflow:auto;max-width:100%;max-height:85vh;border:1px solid #d0d7de;border-radius:4px}
+.samtbu-inline-svg{overflow:auto;max-width:100%;max-height:85vh;border:1px solid #d0d7de;border-radius:4px;cursor:grab}
+.samtbu-inline-svg.samtbu-isvg-panning,.samtbu-inline-svg.samtbu-isvg-panning *{cursor:grabbing!important;user-select:none}
 .samtbu-inline-svg>svg{display:block;max-width:none}
 </style>
 <div class="samtbu-isvg" data-isvg>
@@ -66,6 +67,33 @@
       frame.scrollLeft = fx * z - mx;
       frame.scrollTop = fy * z - my;
     }, { passive: false });
+    // Dra med musa for å flytte figuren. Et klikk uten bevegelse virker som før (lenker, vinduet);
+    // flyttes musa mer enn noen få piksler, blir det dra, og klikket som følger, svelges.
+    var pan = null, moved = false;
+    frame.addEventListener('mousedown', function (e) {
+      if (e.button !== 0) return;
+      pan = { x: e.clientX, y: e.clientY, l: frame.scrollLeft, t: frame.scrollTop };
+      moved = false;
+      e.preventDefault();   // ingen tekstmarkering
+    });
+    window.addEventListener('mousemove', function (e) {
+      if (!pan) return;
+      var dx = e.clientX - pan.x, dy = e.clientY - pan.y;
+      if (!moved && Math.abs(dx) + Math.abs(dy) < 5) return;
+      moved = true;
+      frame.classList.add('samtbu-isvg-panning');
+      frame.scrollLeft = pan.l - dx;
+      frame.scrollTop = pan.t - dy;
+    });
+    window.addEventListener('mouseup', function () {
+      if (!pan) return;
+      pan = null;
+      frame.classList.remove('samtbu-isvg-panning');
+    });
+    frame.addEventListener('click', function (e) {
+      if (moved) { e.preventDefault(); e.stopPropagation(); moved = false; }
+    }, true);
+    frame.addEventListener('dragstart', function (e) { e.preventDefault(); });
     set(1);
   });
 })();
