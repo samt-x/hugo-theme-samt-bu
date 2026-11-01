@@ -1,20 +1,75 @@
 {{- /* Limer en SVG fra sidens mappe rett inn i siden, så lenker og verktøytips i figuren virker.
-     Bruk: {{< inline-svg "project-5-nb.svg" >}}. Figuren skaleres til spaltebredden, men ikke under
-     900 px; i smalere spalter rulles den sidelengs. Figuren må ha viewBox.
+     Bruk: {{< inline-svg "project-5-nb.svg" >}}. Figuren må ha viewBox.
      Valgfritt andre argument: stien til siden som har figuren, når den ligger på en annen side, f.eks.
      {{< inline-svg "project-5-nb.svg" "/prosjektleveranser/loesninger/samhandlingsplattform/oppgavestyring/tidslinje" >}}.
      Slik lages tidslinjene ett sted og vises på sidene Oppgaver og framdrift (solution-task-management#32).
-     Lenker til GitHub-issues i figuren åpnes i et flyttbart vindu (partials/issue-popup.html).
-     Laget for tidslinjen i oppgavestyringen (solution-task-management#32). */ -}}
+     Figuren vises i full størrelse i en ramme som rulles sidelengs og på høyden. Verktøylinja over har
+     − / + / 100 % / Tilpass bredden og en lenke som åpner SVG-fila alene (kan lagres eller kopieres).
+     Ctrl + musehjul over figuren zoomer bare figuren. Lenker til GitHub-issues i figuren åpnes i et
+     flyttbart vindu (partials/issue-popup.html). */ -}}
 {{- $name := .Get 0 -}}
 {{- $from := .Page -}}
+{{- $en := eq .Page.Language.Lang "en" -}}
 {{- with .Get 1 -}}
 {{- $from = site.GetPage . -}}
 {{- if not $from -}}{{- warnf "inline-svg: fant ikke siden %q ved %s" . $.Page.File.Path -}}{{- end -}}
 {{- end -}}
 {{- with and $from ($from.Resources.Get $name) -}}
-<style>.samtbu-inline-svg{overflow-x:auto;max-width:100%;margin:0 0 1rem 0}.samtbu-inline-svg>svg{width:100%;height:auto;min-width:900px}</style>
+<style>
+.samtbu-isvg{margin:0 0 1rem 0}
+.samtbu-isvg-bar{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;font-size:.85rem;margin:0 0 .35rem 0}
+.samtbu-isvg-bar button{border:1px solid #d0d7de;background:#f6f8fa;color:#24292f;border-radius:4px;padding:1px 9px;cursor:pointer;line-height:1.5}
+.samtbu-isvg-bar button:hover{background:#eaeef2}
+.samtbu-isvg-bar .samtbu-isvg-level{min-width:3.5em;text-align:center;color:#57606a}
+.samtbu-isvg-bar a{margin-left:.5rem}
+.samtbu-inline-svg{overflow:auto;max-width:100%;max-height:85vh;border:1px solid #d0d7de;border-radius:4px}
+.samtbu-inline-svg>svg{display:block;max-width:none}
+</style>
+<div class="samtbu-isvg" data-isvg>
+<div class="samtbu-isvg-bar">
+<button type="button" data-z="out" title="{{ if $en }}Zoom out{{ else }}Zoom ut{{ end }}">−</button>
+<span class="samtbu-isvg-level">100 %</span>
+<button type="button" data-z="in" title="{{ if $en }}Zoom in{{ else }}Zoom inn{{ end }}">+</button>
+<button type="button" data-z="one">100 %</button>
+<button type="button" data-z="fit">{{ if $en }}Fit width{{ else }}Tilpass bredden{{ end }}</button>
+<a href="{{ .RelPermalink }}" target="_blank" rel="noopener">{{ if $en }}Open the chart in a new window{{ else }}Åpne figuren i nytt vindu{{ end }} ↗</a>
+</div>
 <div class="samtbu-inline-svg">{{ .Content | safeHTML }}</div>
+</div>
+<script>
+(function () {
+  document.querySelectorAll('[data-isvg]:not([data-isvg-ok])').forEach(function (box) {
+    box.setAttribute('data-isvg-ok', '');
+    var frame = box.querySelector('.samtbu-inline-svg'), svg = frame.querySelector('svg');
+    var level = box.querySelector('.samtbu-isvg-level');
+    if (!svg || !svg.viewBox || !svg.viewBox.baseVal) return;
+    var w = svg.viewBox.baseVal.width, h = svg.viewBox.baseVal.height, z = 1;
+    function set(nz) {
+      z = Math.min(3, Math.max(0.3, nz));
+      svg.style.width = (w * z) + 'px';
+      svg.style.height = (h * z) + 'px';
+      level.textContent = Math.round(z * 100) + ' %';
+    }
+    box.querySelector('.samtbu-isvg-bar').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-z]');
+      if (!b) return;
+      var k = b.getAttribute('data-z');
+      set(k === 'in' ? z * 1.25 : k === 'out' ? z / 1.25 : k === 'one' ? 1 : frame.clientWidth / w);
+    });
+    // Ctrl + musehjul zoomer bare figuren, og holder punktet under musa på plass
+    frame.addEventListener('wheel', function (e) {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      var r = frame.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+      var fx = (frame.scrollLeft + mx) / z, fy = (frame.scrollTop + my) / z;
+      set(e.deltaY < 0 ? z * 1.1 : z / 1.1);
+      frame.scrollLeft = fx * z - mx;
+      frame.scrollTop = fy * z - my;
+    }, { passive: false });
+    set(1);
+  });
+})();
+</script>
 {{- partial "issue-popup.html" $.Page -}}
 {{- else -}}
 {{- warnf "inline-svg: fant ikke %q ved %s" $name .Page.File.Path -}}
