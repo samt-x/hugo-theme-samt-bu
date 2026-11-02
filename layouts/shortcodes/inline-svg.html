@@ -6,7 +6,9 @@
      Figuren vises i full størrelse i en ramme som rulles sidelengs og på høyden. Verktøylinja over har
      − / + / 100 % / Tilpass bredden og en lenke som åpner SVG-fila alene (kan lagres eller kopieres).
      Ctrl + musehjul over figuren zoomer bare figuren. Lenker til GitHub-issues i figuren åpnes i et
-     flyttbart vindu (partials/issue-popup.html). */ -}}
+     flyttbart vindu (partials/issue-popup.html).
+     Tidslinjer fra timeline.py (svg med data-tl) får i tillegg fold ut/inn av sub-issues (▾/▸ i figuren),
+     filteret Alle/Aktive/Forsinkede/Ferdige/Avbrutte og, for innloggede, Mine oppgaver (solution-task-management#44). */ -}}
 {{- $name := .Get 0 -}}
 {{- $from := .Page -}}
 {{- $en := eq .Page.Language.Lang "en" -}}
@@ -25,6 +27,8 @@
 .samtbu-inline-svg{overflow:auto;max-width:100%;max-height:85vh;border:1px solid #d0d7de;border-radius:4px;cursor:grab}
 .samtbu-inline-svg.samtbu-isvg-panning,.samtbu-inline-svg.samtbu-isvg-panning *{cursor:grabbing!important;user-select:none}
 .samtbu-inline-svg>svg{display:block;max-width:none}
+.samtbu-isvg-bar button[aria-pressed="true"]{background:#0969da;border-color:#0969da;color:#fff}
+.samtbu-isvg-bar .samtbu-isvg-label{color:#57606a}
 </style>
 <div class="samtbu-isvg" data-isvg>
 <div class="samtbu-isvg-bar">
@@ -39,6 +43,129 @@
 </div>
 <script>
 (function () {
+  var TL = {{ if $en }}{show: 'Show:', all: 'All', open: 'Active', late: 'Delayed', done: 'Completed', dropped: 'Cancelled',
+            mine: 'My tasks', mineTip: 'Highlight the tasks where you are Responsible or assignee'}
+           {{ else }}{show: 'Vis:', all: 'Alle', open: 'Aktive', late: 'Forsinkede', done: 'Ferdige', dropped: 'Avbrutte',
+            mine: 'Mine oppgaver', mineTip: 'Marker oppgavene der du er Responsible eller assignee'}{{ end }};
+
+  // Tidslinjene fra timeline.py (svg[data-tl], solution-task-management#44): fold sub-issuene inn og ut, filter og
+  // Mine oppgaver. Radene (g.tl-row) flyttes, og pilene tegnes på nytt med samme regel som i timeline.py.
+  // Uten JavaScript vises figuren slik den er tegnet. resized(h) gir ny høyde til zoomen.
+  function timeline(box, svg, resized) {
+    var rows = [].slice.call(svg.querySelectorAll('g.tl-row'));
+    if (!rows.length) return;
+    var top = +svg.getAttribute('data-tl-top'), rh = +svg.getAttribute('data-tl-rowh'), n0 = rows.length;
+    var W = svg.viewBox.baseVal.width, H0 = svg.viewBox.baseVal.height;
+    var byKey = {}, kids = {}, folded = {}, filter = 'all', mine = false, mid = {};
+    rows.forEach(function (r) { byKey[r.getAttribute('data-key')] = r; });
+    rows.forEach(function (r) {
+      var p = r.getAttribute('data-parent');
+      if (p && byKey[p]) (kids[p] = kids[p] || []).push(r);
+    });
+    function match(r) {
+      var s = r.getAttribute('data-state');
+      return filter === 'all' || filter === s || (filter === 'late' && r.hasAttribute('data-late'));
+    }
+    // En forelder vises når den selv eller et av barna passer med filteret
+    function matchTree(r) {
+      return match(r) || (kids[r.getAttribute('data-key')] || []).some(matchTree);
+    }
+    function shown(r) {
+      for (var p = r.getAttribute('data-parent'); p && byKey[p]; p = byKey[p].getAttribute('data-parent')) {
+        if (folded[p]) return false;
+      }
+      return matchTree(r);
+    }
+    function layout() {
+      var i = 0;
+      mid = {};
+      rows.forEach(function (r) {
+        var on = shown(r);
+        r.style.display = on ? '' : 'none';
+        if (!on) return;
+        r.setAttribute('transform', 'translate(0,' + (top + i * rh - +r.getAttribute('data-y')) + ')');
+        mid[r.getAttribute('data-key')] = top + i * rh + rh / 2;
+        i++;
+      });
+      var rowsH = i * rh, d = rowsH - n0 * rh;
+      svg.querySelectorAll('.tl-stripe').forEach(function (e) { e.style.display = +e.getAttribute('data-i') < i ? '' : 'none'; });
+      svg.querySelectorAll('.tl-vh').forEach(function (e) { e.setAttribute('height', rowsH); });
+      svg.querySelectorAll('.tl-vy2').forEach(function (e) { e.setAttribute('y2', top + rowsH + (+e.getAttribute('data-dy') || 0)); });
+      svg.querySelectorAll('.tl-foot').forEach(function (e) { e.setAttribute('transform', 'translate(0,' + d + ')'); });
+      // Pilene: fra slutten på den som blokkerer til starten på den som venter, rundt når det er lite plass
+      svg.querySelectorAll('a.tl-dep').forEach(function (a) {
+        var by = mid[a.getAttribute('data-from')], oy = mid[a.getAttribute('data-to')];
+        a.style.display = by == null || oy == null ? 'none' : '';
+        if (by == null || oy == null) return;
+        var bx2 = +a.getAttribute('data-x1'), ox1 = +a.getAttribute('data-x2'), path, corner;
+        if (ox1 - bx2 >= 16) {
+          path = 'M' + bx2 + ',' + by + 'H' + (bx2 + 8) + 'V' + oy + 'H' + (ox1 - 1);
+          corner = oy;
+        } else {
+          corner = oy > by ? oy - rh / 2 : oy + rh / 2;
+          path = 'M' + bx2 + ',' + by + 'H' + (bx2 + 8) + 'V' + corner + 'H' + (ox1 - 10) + 'V' + oy + 'H' + (ox1 - 1);
+        }
+        a.querySelectorAll('path').forEach(function (p) { p.setAttribute('d', path); });
+        a.querySelectorAll('circle').forEach(function (c) { c.setAttribute('cy', corner); });
+      });
+      svg.querySelectorAll('.tl-fold').forEach(function (g) {
+        var key = g.parentNode.getAttribute('data-key');
+        g.querySelector('text').textContent = folded[key] ? '▸' : '▾';
+      });
+      svg.setAttribute('viewBox', '0 0 ' + W + ' ' + (H0 + d));
+      svg.setAttribute('height', H0 + d);
+      resized(H0 + d);
+    }
+
+    // Fold inn og ut: knappene i figuren vises bare når skriptet kjører
+    svg.querySelectorAll('.tl-fold').forEach(function (g) { g.removeAttribute('display'); });
+    svg.addEventListener('click', function (e) {
+      var g = e.target.closest && e.target.closest('.tl-fold');
+      if (!g) return;
+      e.preventDefault();
+      e.stopPropagation();
+      var key = g.parentNode.getAttribute('data-key');
+      folded[key] = !folded[key];
+      layout();
+    });
+
+    // Filter og Mine oppgaver i en egen linje under verktøylinja
+    var bar = document.createElement('div'), html = '<span class="samtbu-isvg-label">' + TL.show + '</span>';
+    bar.className = 'samtbu-isvg-bar';
+    ['all', 'open', 'late', 'done', 'dropped'].forEach(function (k) {
+      html += '<button type="button" data-tlf="' + k + '" aria-pressed="' + (k === filter) + '">' + TL[k] + '</button>';
+    });
+    var login = '';
+    try { login = (localStorage.getItem('samt-bu-gh-user') || '').toLowerCase(); } catch (e) {}
+    if (login) html += '<button type="button" data-tlm aria-pressed="false" title="' + TL.mineTip + '">' + TL.mine + '</button>';
+    bar.innerHTML = html;
+    box.insertBefore(bar, box.querySelector('.samtbu-inline-svg'));
+    bar.addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      if (b.hasAttribute('data-tlm')) {
+        mine = !mine;
+        b.setAttribute('aria-pressed', mine);
+        rows.forEach(function (r) {
+          var hit = (' ' + r.getAttribute('data-people').toLowerCase() + ' ').indexOf(' ' + login + ' ') >= 0;
+          var m = r.querySelector('.tl-mine');
+          if (mine && hit && !m) {   // gul bakgrunn bak raden, under titler og stolper
+            m = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            m.setAttribute('class', 'tl-mine');
+            m.setAttribute('x', 0); m.setAttribute('y', r.getAttribute('data-y'));
+            m.setAttribute('width', W); m.setAttribute('height', rh); m.setAttribute('fill', '#fff8c5');
+            r.insertBefore(m, r.firstChild);
+          }
+          if (m) m.style.display = mine && hit ? '' : 'none';
+        });
+        return;
+      }
+      filter = b.getAttribute('data-tlf');
+      bar.querySelectorAll('[data-tlf]').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
+      layout();
+    });
+  }
+
   document.querySelectorAll('[data-isvg]:not([data-isvg-ok])').forEach(function (box) {
     box.setAttribute('data-isvg-ok', '');
     var frame = box.querySelector('.samtbu-inline-svg'), svg = frame.querySelector('svg');
@@ -94,6 +221,7 @@
       if (moved) { e.preventDefault(); e.stopPropagation(); moved = false; }
     }, true);
     frame.addEventListener('dragstart', function (e) { e.preventDefault(); });
+    if (svg.hasAttribute('data-tl')) timeline(box, svg, function (nh) { h = nh; set(z); });
     set(1);
   });
 })();
