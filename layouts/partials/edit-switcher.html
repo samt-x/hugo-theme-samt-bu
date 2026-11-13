@@ -122,10 +122,10 @@
     {{ $rel = strings.TrimPrefix "/" $rel }}
     {{ $githubRepo = "samt-bu-pilot-7" }}
 
-  {{ else if or (eq $dir "prosjektleveranser/rammeverk/juss") (hasPrefix $dir "prosjektleveranser/rammeverk/juss/") }}
+  {{ else if or (eq $dir "arkitektur/juss") (hasPrefix $dir "arkitektur/juss/") }}
     {{/* content-legal modul (solution-task-management#51) */}}
     {{ $isModulePage = true }}
-    {{ $rel = strings.TrimPrefix "prosjektleveranser/rammeverk/juss" $dir }}
+    {{ $rel = strings.TrimPrefix "arkitektur/juss" $dir }}
     {{ $rel = strings.TrimPrefix "/" $rel }}
     {{ $githubRepo = "content-legal" }}
 
@@ -198,8 +198,8 @@
   {{ else if or (eq $dir "pilotering/pilot-7") (hasPrefix $dir "pilotering/pilot-7/") }}
     {{ $rel = strings.TrimPrefix "pilotering/pilot-7" $dir }}
     {{ $rel = strings.TrimPrefix "/" $rel }}
-  {{ else if or (eq $dir "prosjektleveranser/rammeverk/juss") (hasPrefix $dir "prosjektleveranser/rammeverk/juss/") }}
-    {{ $rel = strings.TrimPrefix "prosjektleveranser/rammeverk/juss" $dir }}
+  {{ else if or (eq $dir "arkitektur/juss") (hasPrefix $dir "arkitektur/juss/") }}
+    {{ $rel = strings.TrimPrefix "arkitektur/juss" $dir }}
     {{ $rel = strings.TrimPrefix "/" $rel }}
   {{ else if or (eq $dir "ekstern-markedsdialog") (hasPrefix $dir "ekstern-markedsdialog/") }}
     {{ $rel = strings.TrimPrefix "ekstern-markedsdialog" $dir }}
@@ -222,7 +222,7 @@
     {{ if or (eq $dir "pilotering/pilot-5") (hasPrefix $dir "pilotering/pilot-5/") }}{{ $githubRepoSibling = "samt-bu-pilot-5" }}{{ end }}
     {{ if or (eq $dir "pilotering/pilot-6") (hasPrefix $dir "pilotering/pilot-6/") }}{{ $githubRepoSibling = "samt-bu-pilot-6" }}{{ end }}
     {{ if or (eq $dir "pilotering/pilot-7") (hasPrefix $dir "pilotering/pilot-7/") }}{{ $githubRepoSibling = "samt-bu-pilot-7" }}{{ end }}
-    {{ if or (eq $dir "prosjektleveranser/rammeverk/juss") (hasPrefix $dir "prosjektleveranser/rammeverk/juss/") }}{{ $githubRepoSibling = "content-legal" }}{{ end }}
+    {{ if or (eq $dir "arkitektur/juss") (hasPrefix $dir "arkitektur/juss/") }}{{ $githubRepoSibling = "content-legal" }}{{ end }}
     {{ if or (eq $dir "ekstern-markedsdialog") (hasPrefix $dir "ekstern-markedsdialog/") }}{{ $githubRepoSibling = "samt-bu-market-engagement" }}{{ end }}
     {{ $parentRel := path.Dir $rel }}
     {{ $parentDirPath := cond (eq $parentRel ".") "content" (printf "content/%s" $parentRel) }}
@@ -708,9 +708,9 @@
     {{- else if or (eq $d2 "pilotering/pilot-7") (hasPrefix $d2 "pilotering/pilot-7/") -}}
       {{- $x2 = true -}}{{- $r2 = "samt-bu-pilot-7" -}}
       {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "pilotering/pilot-7" $d2) -}}
-    {{- else if or (eq $d2 "prosjektleveranser/rammeverk/juss") (hasPrefix $d2 "prosjektleveranser/rammeverk/juss/") -}}
+    {{- else if or (eq $d2 "arkitektur/juss") (hasPrefix $d2 "arkitektur/juss/") -}}
       {{- $x2 = true -}}{{- $r2 = "content-legal" -}}
-      {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "prosjektleveranser/rammeverk/juss" $d2) -}}
+      {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "arkitektur/juss" $d2) -}}
     {{- else if or (eq $d2 "ekstern-markedsdialog") (hasPrefix $d2 "ekstern-markedsdialog/") -}}
       {{- $x2 = true -}}{{- $r2 = "samt-bu-market-engagement" -}}
       {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "ekstern-markedsdialog" $d2) -}}
