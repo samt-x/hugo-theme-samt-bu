@@ -115,42 +115,9 @@
               {{ with .Params.status }}
                 <span class="page-meta-status">{{ partial "status-symbol.html" $ }}{{ . }}</span>
               {{ end }}
-              {{/* Repo-indikator – holdes i sync med routing-logikken i edit-switcher.html */}}
+              {{/* Repo-indikator – fra page-repo.html, samme kilde som edit-switcher.html */}}
               {{ if .File }}
-                {{ $repo := "samt-bu-docs" }}
-                {{ $dir := path.Dir .File.Path }}
-                {{ if or (eq $dir "utkast") (hasPrefix $dir "utkast/") }}
-                  {{ $repo = "samt-bu-drafts" }}
-                {{ else if or (eq $dir "prosjektleveranser/loesninger/samhandlingsplattform/samt-bu-docs") (hasPrefix $dir "prosjektleveranser/loesninger/samhandlingsplattform/samt-bu-docs/") }}
-                  {{ $repo = "solution-samt-bu-docs" }}
-                {{ else if or (eq $dir "prosjektleveranser/loesninger/samhandlingsplattform/oppgavestyring") (hasPrefix $dir "prosjektleveranser/loesninger/samhandlingsplattform/oppgavestyring/") }}
-                  {{ $repo = "solution-task-management" }}
-                {{ else if or (eq $dir "arkitektur/overordnet-arkitektur") (hasPrefix $dir "arkitektur/overordnet-arkitektur/") }}
-                  {{ $repo = "team-architecture" }}
-                {{ else if or (eq $dir "pilotering/pilot-1") (hasPrefix $dir "pilotering/pilot-1/") }}
-                  {{ $repo = "samt-bu-pilot-1" }}
-                {{ else if or (eq $dir "pilotering/pilot-2") (hasPrefix $dir "pilotering/pilot-2/") }}
-                  {{ $repo = "samt-bu-pilot-2" }}
-                {{ else if or (eq $dir "pilotering/pilot-3") (hasPrefix $dir "pilotering/pilot-3/") }}
-                  {{ $repo = "samt-bu-pilot-3" }}
-                {{ else if or (eq $dir "pilotering/pilot-4") (hasPrefix $dir "pilotering/pilot-4/") }}
-                  {{ $repo = "samt-bu-pilot-4" }}
-                {{ else if or (eq $dir "pilotering/pilot-5") (hasPrefix $dir "pilotering/pilot-5/") }}
-                  {{ $repo = "samt-bu-pilot-5" }}
-                {{ else if or (eq $dir "pilotering/pilot-6") (hasPrefix $dir "pilotering/pilot-6/") }}
-                  {{ $repo = "samt-bu-pilot-6" }}
-                {{ else if or (eq $dir "pilotering/pilot-7") (hasPrefix $dir "pilotering/pilot-7/") }}
-                  {{ $repo = "samt-bu-pilot-7" }}
-                {{ else if or (eq $dir "arkitektur/juss") (hasPrefix $dir "arkitektur/juss/") }}
-                  {{ $repo = "content-legal" }}
-                {{ else if or (eq $dir "arkitektur/informasjonsarkitektur") (hasPrefix $dir "arkitektur/informasjonsarkitektur/") }}
-                  {{ $repo = "team-semantics" }}
-                {{ else if or (eq $dir "ekstern-markedsdialog") (hasPrefix $dir "ekstern-markedsdialog/") }}
-                  {{/* Manglet her da modulen ble lagt til – alle sider under
-                       /ekstern-markedsdialog/ pekte på samt-bu-docs. Funnet
-                       2026-08-02 ved test av innspill fra ekstern bruker. */}}
-                  {{ $repo = "samt-bu-market-engagement" }}
-                {{ end }}
+                {{ $repo := (partial "page-repo.html" .).repo }}
                 <span class="page-meta-repo"><a href="https://github.com/SAMT-X/{{ $repo }}" target="_blank" rel="noopener">SAMT-X/{{ $repo }}</a></span>
               {{ end }}
             </div>

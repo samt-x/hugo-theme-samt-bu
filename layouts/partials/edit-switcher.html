@@ -1,5 +1,5 @@
 {{/* Edit switcher: dropdown for å redigere gjeldende side (WYSIWYG), opprette ny side, slette, osv.
-     Modul-sider (utkast/*, prosjektleveranser/loesninger/samhandlingsplattform/samt-bu-docs/*, arkitektur/overordnet-arkitektur/*, pilotering/pilot-1, arkitektur/informasjonsarkitektur/*) peker til riktig repo.
+     Modul-sider peker til riktig repo via page-repo.html (leser stien til fila Hugo brukte).
      Rot-sider i moduler er redigerbare; docs-rot forblir deaktivert (tom entrySlug). */}}
 {{ $lang := .Site.Language.Lang }}
 {{ $entrySlug := "" }}
@@ -33,114 +33,11 @@
 
 {{ $isModulePage := false }}
 {{ if .File }}
-  {{/* path.Dir normaliserer Windows-backslash til forward slash */}}
-  {{ $dir := path.Dir .File.Path }}
-  {{ $rel := "" }}
-  {{ $isLocalUnderOverordnet := or (eq $dir "arkitektur/overordnet-arkitektur/maalbildet") (hasPrefix $dir "arkitektur/overordnet-arkitektur/maalbildet/") (eq $dir "arkitektur/overordnet-arkitektur/veikart") (hasPrefix $dir "arkitektur/overordnet-arkitektur/veikart/") }}
-
-  {{ if or (eq $dir "utkast") (hasPrefix $dir "utkast/") }}
-    {{/* samt-bu-drafts modul */}}
-    {{ $isModulePage = true }}
-    {{ $rel = strings.TrimPrefix "utkast" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-    {{ $githubRepo = "samt-bu-drafts" }}
-
-  {{ else if or (eq $dir "prosjektleveranser/loesninger/samhandlingsplattform/samt-bu-docs") (hasPrefix $dir "prosjektleveranser/loesninger/samhandlingsplattform/samt-bu-docs/") }}
-    {{/* solution-samt-bu-docs modul */}}
-    {{ $isModulePage = true }}
-    {{ $rel = strings.TrimPrefix "prosjektleveranser/loesninger/samhandlingsplattform/samt-bu-docs" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-    {{ $githubRepo = "solution-samt-bu-docs" }}
-
-  {{ else if or (eq $dir "prosjektleveranser/loesninger/samhandlingsplattform/oppgavestyring") (hasPrefix $dir "prosjektleveranser/loesninger/samhandlingsplattform/oppgavestyring/") }}
-    {{/* solution-task-management modul */}}
-    {{ $isModulePage = true }}
-    {{ $rel = strings.TrimPrefix "prosjektleveranser/loesninger/samhandlingsplattform/oppgavestyring" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-    {{ $githubRepo = "solution-task-management" }}
-
-  {{ else if and (or (eq $dir "arkitektur/overordnet-arkitektur") (hasPrefix $dir "arkitektur/overordnet-arkitektur/")) (not $isLocalUnderOverordnet) }}
-    {{/* team-architecture modul – maalbildet og veikart er lokale i samt-bu-docs */}}
-    {{ $isModulePage = true }}
-    {{ $rel = strings.TrimPrefix "arkitektur/overordnet-arkitektur" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-    {{ $githubRepo = "team-architecture" }}
-
-  {{ else if or (eq $dir "arkitektur/informasjonsarkitektur") (hasPrefix $dir "arkitektur/informasjonsarkitektur/") }}
-    {{/* team-semantics modul – hele stien, også undersider (solution-samt-bu-docs#78) */}}
-    {{ $isModulePage = true }}
-    {{ $rel = strings.TrimPrefix "arkitektur/informasjonsarkitektur" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-    {{ $githubRepo = "team-semantics" }}
-
-  {{ else if or (eq $dir "pilotering/pilot-1") (hasPrefix $dir "pilotering/pilot-1/") }}
-    {{/* samt-bu-pilot-1 modul */}}
-    {{ $isModulePage = true }}
-    {{ $rel = strings.TrimPrefix "pilotering/pilot-1" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-    {{ $githubRepo = "samt-bu-pilot-1" }}
-
-  {{ else if or (eq $dir "pilotering/pilot-2") (hasPrefix $dir "pilotering/pilot-2/") }}
-    {{/* samt-bu-pilot-2 modul */}}
-    {{ $isModulePage = true }}
-    {{ $rel = strings.TrimPrefix "pilotering/pilot-2" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-    {{ $githubRepo = "samt-bu-pilot-2" }}
-
-  {{ else if or (eq $dir "pilotering/pilot-3") (hasPrefix $dir "pilotering/pilot-3/") }}
-    {{/* samt-bu-pilot-3 modul */}}
-    {{ $isModulePage = true }}
-    {{ $rel = strings.TrimPrefix "pilotering/pilot-3" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-    {{ $githubRepo = "samt-bu-pilot-3" }}
-
-  {{ else if or (eq $dir "pilotering/pilot-4") (hasPrefix $dir "pilotering/pilot-4/") }}
-    {{/* samt-bu-pilot-4 modul */}}
-    {{ $isModulePage = true }}
-    {{ $rel = strings.TrimPrefix "pilotering/pilot-4" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-    {{ $githubRepo = "samt-bu-pilot-4" }}
-
-  {{ else if or (eq $dir "pilotering/pilot-5") (hasPrefix $dir "pilotering/pilot-5/") }}
-    {{/* samt-bu-pilot-5 modul */}}
-    {{ $isModulePage = true }}
-    {{ $rel = strings.TrimPrefix "pilotering/pilot-5" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-    {{ $githubRepo = "samt-bu-pilot-5" }}
-
-  {{ else if or (eq $dir "pilotering/pilot-6") (hasPrefix $dir "pilotering/pilot-6/") }}
-    {{/* samt-bu-pilot-6 modul */}}
-    {{ $isModulePage = true }}
-    {{ $rel = strings.TrimPrefix "pilotering/pilot-6" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-    {{ $githubRepo = "samt-bu-pilot-6" }}
-
-  {{ else if or (eq $dir "pilotering/pilot-7") (hasPrefix $dir "pilotering/pilot-7/") }}
-    {{/* samt-bu-pilot-7 modul */}}
-    {{ $isModulePage = true }}
-    {{ $rel = strings.TrimPrefix "pilotering/pilot-7" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-    {{ $githubRepo = "samt-bu-pilot-7" }}
-
-  {{ else if or (eq $dir "arkitektur/juss") (hasPrefix $dir "arkitektur/juss/") }}
-    {{/* content-legal modul (solution-task-management#51) */}}
-    {{ $isModulePage = true }}
-    {{ $rel = strings.TrimPrefix "arkitektur/juss" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-    {{ $githubRepo = "content-legal" }}
-
-  {{ else if or (eq $dir "ekstern-markedsdialog") (hasPrefix $dir "ekstern-markedsdialog/") }}
-    {{/* samt-bu-market-engagement modul */}}
-    {{ $isModulePage = true }}
-    {{ $rel = strings.TrimPrefix "ekstern-markedsdialog" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-    {{ $githubRepo = "samt-bu-market-engagement" }}
-
-  {{ else }}
-    {{/* Lokal docs-side */}}
-    {{ $rel = strings.TrimPrefix "." $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-  {{ end }}
+  {{/* Repo og sti i repoet fra page-repo.html – eneste kilde for sti → repo (solution-samt-bu-docs#82) */}}
+  {{ $pr := partial "page-repo.html" . }}
+  {{ $githubRepo = $pr.repo }}
+  {{ $isModulePage = $pr.isModule }}
+  {{ $rel := $pr.rel }}
 
   {{ if eq $rel "" }}
     {{/* Rot-side: modul-rot er redigerbar (slug = "_index"), docs-rot forblir deaktivert */}}
@@ -159,71 +56,10 @@
 {{ $siblingParentPath := "" }}
 {{ $addSiblingURL := "" }}
 {{ if and .File (ne $entrySlug "") }}
-  {{ $rel := "" }}
-  {{ $dir := path.Dir .File.Path }}
-  {{ $isLocalUnderOverordnet := or (eq $dir "arkitektur/overordnet-arkitektur/maalbildet") (hasPrefix $dir "arkitektur/overordnet-arkitektur/maalbildet/") (eq $dir "arkitektur/overordnet-arkitektur/veikart") (hasPrefix $dir "arkitektur/overordnet-arkitektur/veikart/") }}
-  {{ if or (eq $dir "utkast") (hasPrefix $dir "utkast/") }}
-    {{ $rel = strings.TrimPrefix "utkast" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-  {{ else if or (eq $dir "prosjektleveranser/loesninger/samhandlingsplattform/samt-bu-docs") (hasPrefix $dir "prosjektleveranser/loesninger/samhandlingsplattform/samt-bu-docs/") }}
-    {{ $rel = strings.TrimPrefix "prosjektleveranser/loesninger/samhandlingsplattform/samt-bu-docs" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-  {{ else if or (eq $dir "prosjektleveranser/loesninger/samhandlingsplattform/oppgavestyring") (hasPrefix $dir "prosjektleveranser/loesninger/samhandlingsplattform/oppgavestyring/") }}
-    {{ $rel = strings.TrimPrefix "prosjektleveranser/loesninger/samhandlingsplattform/oppgavestyring" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-  {{ else if and (or (eq $dir "arkitektur/overordnet-arkitektur") (hasPrefix $dir "arkitektur/overordnet-arkitektur/")) (not $isLocalUnderOverordnet) }}
-    {{ $rel = strings.TrimPrefix "arkitektur/overordnet-arkitektur" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-  {{ else if or (eq $dir "arkitektur/informasjonsarkitektur") (hasPrefix $dir "arkitektur/informasjonsarkitektur/") }}
-    {{ $rel = strings.TrimPrefix "arkitektur/informasjonsarkitektur" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-  {{ else if or (eq $dir "pilotering/pilot-1") (hasPrefix $dir "pilotering/pilot-1/") }}
-    {{ $rel = strings.TrimPrefix "pilotering/pilot-1" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-  {{ else if or (eq $dir "pilotering/pilot-2") (hasPrefix $dir "pilotering/pilot-2/") }}
-    {{ $rel = strings.TrimPrefix "pilotering/pilot-2" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-  {{ else if or (eq $dir "pilotering/pilot-3") (hasPrefix $dir "pilotering/pilot-3/") }}
-    {{ $rel = strings.TrimPrefix "pilotering/pilot-3" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-  {{ else if or (eq $dir "pilotering/pilot-4") (hasPrefix $dir "pilotering/pilot-4/") }}
-    {{ $rel = strings.TrimPrefix "pilotering/pilot-4" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-  {{ else if or (eq $dir "pilotering/pilot-5") (hasPrefix $dir "pilotering/pilot-5/") }}
-    {{ $rel = strings.TrimPrefix "pilotering/pilot-5" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-  {{ else if or (eq $dir "pilotering/pilot-6") (hasPrefix $dir "pilotering/pilot-6/") }}
-    {{ $rel = strings.TrimPrefix "pilotering/pilot-6" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-  {{ else if or (eq $dir "pilotering/pilot-7") (hasPrefix $dir "pilotering/pilot-7/") }}
-    {{ $rel = strings.TrimPrefix "pilotering/pilot-7" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-  {{ else if or (eq $dir "arkitektur/juss") (hasPrefix $dir "arkitektur/juss/") }}
-    {{ $rel = strings.TrimPrefix "arkitektur/juss" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-  {{ else if or (eq $dir "ekstern-markedsdialog") (hasPrefix $dir "ekstern-markedsdialog/") }}
-    {{ $rel = strings.TrimPrefix "ekstern-markedsdialog" $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-  {{ else }}
-    {{ $rel = strings.TrimPrefix "." $dir }}
-    {{ $rel = strings.TrimPrefix "/" $rel }}
-  {{ end }}
+  {{ $pr := partial "page-repo.html" . }}
+  {{ $rel := $pr.rel }}
   {{ if ne $rel "" }}
-    {{ $githubRepoSibling := "samt-bu-docs" }}
-    {{ if or (eq $dir "utkast") (hasPrefix $dir "utkast/") }}{{ $githubRepoSibling = "samt-bu-drafts" }}{{ end }}
-    {{ if or (eq $dir "prosjektleveranser/loesninger/samhandlingsplattform/samt-bu-docs") (hasPrefix $dir "prosjektleveranser/loesninger/samhandlingsplattform/samt-bu-docs/") }}{{ $githubRepoSibling = "solution-samt-bu-docs" }}{{ end }}
-    {{ if or (eq $dir "prosjektleveranser/loesninger/samhandlingsplattform/oppgavestyring") (hasPrefix $dir "prosjektleveranser/loesninger/samhandlingsplattform/oppgavestyring/") }}{{ $githubRepoSibling = "solution-task-management" }}{{ end }}
-    {{ if and (or (eq $dir "arkitektur/overordnet-arkitektur") (hasPrefix $dir "arkitektur/overordnet-arkitektur/")) (not $isLocalUnderOverordnet) }}{{ $githubRepoSibling = "team-architecture" }}{{ end }}
-    {{ if or (eq $dir "arkitektur/informasjonsarkitektur") (hasPrefix $dir "arkitektur/informasjonsarkitektur/") }}{{ $githubRepoSibling = "team-semantics" }}{{ end }}
-    {{ if or (eq $dir "pilotering/pilot-1") (hasPrefix $dir "pilotering/pilot-1/") }}{{ $githubRepoSibling = "samt-bu-pilot-1" }}{{ end }}
-    {{ if or (eq $dir "pilotering/pilot-2") (hasPrefix $dir "pilotering/pilot-2/") }}{{ $githubRepoSibling = "samt-bu-pilot-2" }}{{ end }}
-    {{ if or (eq $dir "pilotering/pilot-3") (hasPrefix $dir "pilotering/pilot-3/") }}{{ $githubRepoSibling = "samt-bu-pilot-3" }}{{ end }}
-    {{ if or (eq $dir "pilotering/pilot-4") (hasPrefix $dir "pilotering/pilot-4/") }}{{ $githubRepoSibling = "samt-bu-pilot-4" }}{{ end }}
-    {{ if or (eq $dir "pilotering/pilot-5") (hasPrefix $dir "pilotering/pilot-5/") }}{{ $githubRepoSibling = "samt-bu-pilot-5" }}{{ end }}
-    {{ if or (eq $dir "pilotering/pilot-6") (hasPrefix $dir "pilotering/pilot-6/") }}{{ $githubRepoSibling = "samt-bu-pilot-6" }}{{ end }}
-    {{ if or (eq $dir "pilotering/pilot-7") (hasPrefix $dir "pilotering/pilot-7/") }}{{ $githubRepoSibling = "samt-bu-pilot-7" }}{{ end }}
-    {{ if or (eq $dir "arkitektur/juss") (hasPrefix $dir "arkitektur/juss/") }}{{ $githubRepoSibling = "content-legal" }}{{ end }}
-    {{ if or (eq $dir "ekstern-markedsdialog") (hasPrefix $dir "ekstern-markedsdialog/") }}{{ $githubRepoSibling = "samt-bu-market-engagement" }}{{ end }}
+    {{ $githubRepoSibling := $pr.repo }}
     {{ $parentRel := path.Dir $rel }}
     {{ $parentDirPath := cond (eq $parentRel ".") "content" (printf "content/%s" $parentRel) }}
     {{ $siblingRepo = $githubRepoSibling }}
@@ -667,56 +503,10 @@
 {{- $sibs := slice -}}
 {{- range .Parent.Pages -}}
   {{- if .File -}}
-    {{- $d2 := path.Dir .File.Path -}}
-    {{- $r2 := "samt-bu-docs" -}}
-    {{- $x2 := false -}}
-    {{- $rl2 := "" -}}
-    {{- $isLocalD2 := or (eq $d2 "arkitektur/overordnet-arkitektur/maalbildet") (hasPrefix $d2 "arkitektur/overordnet-arkitektur/maalbildet/") (eq $d2 "arkitektur/overordnet-arkitektur/veikart") (hasPrefix $d2 "arkitektur/overordnet-arkitektur/veikart/") -}}
-    {{- if or (eq $d2 "utkast") (hasPrefix $d2 "utkast/") -}}
-      {{- $x2 = true -}}{{- $r2 = "samt-bu-drafts" -}}
-      {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "utkast" $d2) -}}
-    {{- else if or (eq $d2 "prosjektleveranser/loesninger/samhandlingsplattform/samt-bu-docs") (hasPrefix $d2 "prosjektleveranser/loesninger/samhandlingsplattform/samt-bu-docs/") -}}
-      {{- $x2 = true -}}{{- $r2 = "solution-samt-bu-docs" -}}
-      {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "prosjektleveranser/loesninger/samhandlingsplattform/samt-bu-docs" $d2) -}}
-    {{- else if or (eq $d2 "prosjektleveranser/loesninger/samhandlingsplattform/oppgavestyring") (hasPrefix $d2 "prosjektleveranser/loesninger/samhandlingsplattform/oppgavestyring/") -}}
-      {{- $x2 = true -}}{{- $r2 = "solution-task-management" -}}
-      {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "prosjektleveranser/loesninger/samhandlingsplattform/oppgavestyring" $d2) -}}
-    {{- else if and (or (eq $d2 "arkitektur/overordnet-arkitektur") (hasPrefix $d2 "arkitektur/overordnet-arkitektur/")) (not $isLocalD2) -}}
-      {{- $x2 = true -}}{{- $r2 = "team-architecture" -}}
-      {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "arkitektur/overordnet-arkitektur" $d2) -}}
-    {{- else if or (eq $d2 "arkitektur/informasjonsarkitektur") (hasPrefix $d2 "arkitektur/informasjonsarkitektur/") -}}
-      {{- $x2 = true -}}{{- $r2 = "team-semantics" -}}
-      {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "arkitektur/informasjonsarkitektur" $d2) -}}
-    {{- else if or (eq $d2 "pilotering/pilot-1") (hasPrefix $d2 "pilotering/pilot-1/") -}}
-      {{- $x2 = true -}}{{- $r2 = "samt-bu-pilot-1" -}}
-      {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "pilotering/pilot-1" $d2) -}}
-    {{- else if or (eq $d2 "pilotering/pilot-2") (hasPrefix $d2 "pilotering/pilot-2/") -}}
-      {{- $x2 = true -}}{{- $r2 = "samt-bu-pilot-2" -}}
-      {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "pilotering/pilot-2" $d2) -}}
-    {{- else if or (eq $d2 "pilotering/pilot-3") (hasPrefix $d2 "pilotering/pilot-3/") -}}
-      {{- $x2 = true -}}{{- $r2 = "samt-bu-pilot-3" -}}
-      {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "pilotering/pilot-3" $d2) -}}
-    {{- else if or (eq $d2 "pilotering/pilot-4") (hasPrefix $d2 "pilotering/pilot-4/") -}}
-      {{- $x2 = true -}}{{- $r2 = "samt-bu-pilot-4" -}}
-      {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "pilotering/pilot-4" $d2) -}}
-    {{- else if or (eq $d2 "pilotering/pilot-5") (hasPrefix $d2 "pilotering/pilot-5/") -}}
-      {{- $x2 = true -}}{{- $r2 = "samt-bu-pilot-5" -}}
-      {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "pilotering/pilot-5" $d2) -}}
-    {{- else if or (eq $d2 "pilotering/pilot-6") (hasPrefix $d2 "pilotering/pilot-6/") -}}
-      {{- $x2 = true -}}{{- $r2 = "samt-bu-pilot-6" -}}
-      {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "pilotering/pilot-6" $d2) -}}
-    {{- else if or (eq $d2 "pilotering/pilot-7") (hasPrefix $d2 "pilotering/pilot-7/") -}}
-      {{- $x2 = true -}}{{- $r2 = "samt-bu-pilot-7" -}}
-      {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "pilotering/pilot-7" $d2) -}}
-    {{- else if or (eq $d2 "arkitektur/juss") (hasPrefix $d2 "arkitektur/juss/") -}}
-      {{- $x2 = true -}}{{- $r2 = "content-legal" -}}
-      {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "arkitektur/juss" $d2) -}}
-    {{- else if or (eq $d2 "ekstern-markedsdialog") (hasPrefix $d2 "ekstern-markedsdialog/") -}}
-      {{- $x2 = true -}}{{- $r2 = "samt-bu-market-engagement" -}}
-      {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "ekstern-markedsdialog" $d2) -}}
-    {{- else -}}
-      {{- $rl2 = strings.TrimPrefix "/" (strings.TrimPrefix "." $d2) -}}
-    {{- end -}}
+    {{- $pr2 := partial "page-repo.html" . -}}
+    {{- $r2 := $pr2.repo -}}
+    {{- $x2 := $pr2.isModule -}}
+    {{- $rl2 := $pr2.rel -}}
     {{- $dp2 := cond (eq $rl2 "") "content" (printf "content/%s" $rl2) -}}
     {{- $sibs = $sibs | append (dict "title" .Title "linkTitle" .LinkTitle "weight" .Weight "relPermalink" .RelPermalink "dirPath" $dp2 "repo" $r2 "isExternal" $x2) -}}
   {{- end -}}

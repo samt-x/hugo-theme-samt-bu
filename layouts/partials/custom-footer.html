@@ -571,23 +571,15 @@ function checkCollaboratorPermission(repo, callback) {
    Operasjoner: samtbuPrList · samtbuPrMerge · samtbuPrClose · samtbuPrComment
 --------------------------------------------------------------------------- */
 var SAMTBU_ORG = 'SAMT-X';
-var SAMTBU_REPOS = [
-  'samt-bu-docs',
-  'solution-samt-bu-docs',
-  'solution-task-management',
-  'team-architecture',
-  'team-semantics',
-  'samt-bu-drafts',
-  'samt-bu-pilot-1',
-  'samt-bu-pilot-2',
-  'samt-bu-pilot-3',
-  'samt-bu-pilot-4',
-  'samt-bu-pilot-5',
-  'samt-bu-pilot-6',
-  'samt-bu-pilot-7',
-  'samt-bu-market-engagement',
-  'content-legal'
-];
+// samt-bu-docs + alle innholdsmodulene i hugo.toml (hugo.Deps), så nye moduler kommer med av seg selv
+// (solution-samt-bu-docs#82). Rekkefølgen er den Hugo gir.
+{{- $samtbuRepos := slice "samt-bu-docs" -}}
+{{- range hugo.Deps -}}
+  {{- if hasPrefix (lower .Path) "github.com/samt-x/" -}}
+    {{- $samtbuRepos = $samtbuRepos | append (path.Base .Path) -}}
+  {{- end -}}
+{{- end }}
+var SAMTBU_REPOS = {{ $samtbuRepos | uniq | jsonify | safeJS }};
 
 // Lavnivå: ett kall mot GitHub-API-et. Kaster Error med GitHubs egen melding.
 function samtbuGh(path, opts) {

@@ -1,0 +1,31 @@
+{{/* page-repo.html – hvilket repo en side kommer fra, og hvor fila ligger i repoet.
+     Eneste kilde for sti → repo i temaet (solution-samt-bu-docs#82, #81 punkt 3).
+
+     Leser stien til fila Hugo faktisk brukte:
+       modul:  …/<repo>@<versjon>/content/<rel>/_index.nb.md   (Go-modulcachen)
+       lokal:  …/samt-bu-docs/content/<rel>/_index.nb.md
+     Ingen tabell å vedlikeholde: en ny modul i hugo.toml trenger ingenting her, og en lokal
+     fil under en modulsti (f.eks. arkitektur/overordnet-arkitektur/maalbildet) får riktig repo
+     av seg selv, fordi lokal fil vinner i Hugo og det er den fila vi leser stien til.
+
+     Kall: {{ $r := partial "page-repo.html" . }}
+     Gir: dict
+       repo      reponavn uten org, f.eks. "samt-bu-pilot-1" (standard "samt-bu-docs")
+       rel       mappen relativt til repoets content/, "" for repoets rot
+       isModule  true når repo ≠ samt-bu-docs */}}
+{{- $repo := "samt-bu-docs" -}}
+{{- $rel := "" -}}
+{{- with .File -}}
+  {{- $fn := replace .Filename "\\" "/" -}}
+  {{- $m := findRESubmatch `/([^/]+)/content/(.*)$` $fn 1 -}}
+  {{- with $m -}}
+    {{- $dirName := index (index . 0) 1 -}}
+    {{- $repo = index (split $dirName "@") 0 -}}
+    {{- $rel = path.Dir (index (index . 0) 2) -}}
+    {{- if eq $rel "." -}}{{- $rel = "" -}}{{- end -}}
+  {{- else -}}
+    {{- /* Stopp heller enn å rute stille til feil repo */ -}}
+    {{- errorf "page-repo.html: fant ikke <repo>/content/ i stien %q – sjekk modulcachen eller monteringen" $fn -}}
+  {{- end -}}
+{{- end -}}
+{{- return dict "repo" $repo "rel" $rel "isModule" (ne $repo "samt-bu-docs") -}}

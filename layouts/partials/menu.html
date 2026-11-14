@@ -48,37 +48,11 @@
 {{ $showvisitedlinks := .showvisitedlinks }}
 {{ $currentNode := .currentnode }}
  {{with .sect}}
-  {{/* Repo-indikator – holdes i sync med routing-logikken i edit-switcher.html og header.html */}}
+  {{/* Repo-indikator på modulens forside – fra page-repo.html, samme kilde som edit-switcher.html */}}
   {{ $menuRepo := "" }}
   {{ if .File }}
-    {{ $menuDir := path.Dir .File.Path }}
-    {{ if eq $menuDir "utkast" }}
-      {{ $menuRepo = "samt-bu-drafts" }}
-    {{ else if eq $menuDir "prosjektleveranser/loesninger/samhandlingsplattform/samt-bu-docs" }}
-      {{ $menuRepo = "solution-samt-bu-docs" }}
-    {{ else if eq $menuDir "prosjektleveranser/loesninger/samhandlingsplattform/oppgavestyring" }}
-      {{ $menuRepo = "solution-task-management" }}
-    {{ else if eq $menuDir "arkitektur/overordnet-arkitektur" }}
-      {{ $menuRepo = "team-architecture" }}
-    {{ else if eq $menuDir "pilotering/pilot-1" }}
-      {{ $menuRepo = "samt-bu-pilot-1" }}
-    {{ else if eq $menuDir "pilotering/pilot-2" }}
-      {{ $menuRepo = "samt-bu-pilot-2" }}
-    {{ else if eq $menuDir "pilotering/pilot-3" }}
-      {{ $menuRepo = "samt-bu-pilot-3" }}
-    {{ else if eq $menuDir "pilotering/pilot-4" }}
-      {{ $menuRepo = "samt-bu-pilot-4" }}
-    {{ else if eq $menuDir "pilotering/pilot-5" }}
-      {{ $menuRepo = "samt-bu-pilot-5" }}
-    {{ else if eq $menuDir "pilotering/pilot-6" }}
-      {{ $menuRepo = "samt-bu-pilot-6" }}
-    {{ else if eq $menuDir "pilotering/pilot-7" }}
-      {{ $menuRepo = "samt-bu-pilot-7" }}
-    {{ else if eq $menuDir "arkitektur/juss" }}
-      {{ $menuRepo = "content-legal" }}
-    {{ else if eq $menuDir "arkitektur/informasjonsarkitektur" }}
-      {{ $menuRepo = "team-semantics" }}
-    {{ end }}
+    {{ $mpr := partial "page-repo.html" . }}
+    {{ if and $mpr.isModule (eq $mpr.rel "") }}{{ $menuRepo = $mpr.repo }}{{ end }}
   {{ end }}
   {{if .IsSection}}
     {{safeHTML .Params.head}}
