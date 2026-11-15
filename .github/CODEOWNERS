@@ -1,0 +1,4 @@
+# Generert fra tabellen «Hvem behandler pull requests» i Konvensjoner
+# (samt-x/solution-task-management, content/konvensjoner/). Endre tabellen der, ikke her,
+# og kjør .github/scripts/codeowners.py --apply.
+* @samt-x/solution-samt-bu-docs
