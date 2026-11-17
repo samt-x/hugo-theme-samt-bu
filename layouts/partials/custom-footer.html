@@ -125,6 +125,40 @@ function doGitHubLogin(onSuccess, loginHint) {
   window.addEventListener('message', handleMessage);
 }
 
+// Hugo-kortkoder (to krøllparenteser + «<» eller «%») tåler ikke en runde gjennom TipTap: med html:false blir «<» til
+// «&lt;» og linjene slås sammen (solution-samt-bu-docs#95). Før innlasting pakkes hver blokk som starter med en kortkode
+// inn i en kodeblokk (```hugo-kortkode), som TipTap lar være urørt; ved lagring pakkes den ut igjen.
+// En blokk varer til alle kortkoder med sluttkode (/navn) er lukket. Kortkoder midt i en tekstlinje dekkes ikke.
+// NB: denne fila er en Go-mal – skriv aldri to krøllparenteser etter hverandre her, heller ikke i kommentarer.
+function samtbuWrapShortcodes(md) {
+  if (!md || !/\{\{[<%]/.test(md)) return md;
+  var lines = md.split('\n');
+  var paired = {};
+  var reClose = /\{\{[<%]\s*\/\s*([\w-]+)/g, m;
+  while ((m = reClose.exec(md)) !== null) paired[m[1]] = true;
+  var out = [], i = 0;
+  while (i < lines.length) {
+    if (!/^\s*\{\{[<%]/.test(lines[i])) { out.push(lines[i]); i++; continue; }
+    var depth = 0, j = i;
+    do {
+      var reTag = /\{\{[<%]\s*(\/?)\s*([\w-]+)/g, t;
+      while ((t = reTag.exec(lines[j])) !== null) {
+        if (t[1]) depth--; else if (paired[t[2]]) depth++;
+      }
+      j++;
+    } while (depth > 0 && j < lines.length);
+    out.push('```hugo-kortkode');
+    for (var k = i; k < j; k++) out.push(lines[k]);
+    out.push('```');
+    i = j;
+  }
+  return out.join('\n');
+}
+function samtbuUnwrapShortcodes(md) {
+  if (!md || md.indexOf('```hugo-kortkode') === -1) return md;
+  return md.replace(/```hugo-kortkode\n([\s\S]*?)\n```/g, '$1');
+}
+
 // Sjekk om eit bygg pågår akkurat nå – returnerer true/false via callback (best-effort)
 function checkBuildInProgress(filePath, callback) {
   var token = getStoredToken();
@@ -1787,7 +1821,7 @@ setTimeout(function() {
 
   function npEditorToMarkdown() {
     if (!npEditor) return '';
-    var md = npEditor.storage.markdown.getMarkdown();
+    var md = samtbuUnwrapShortcodes(npEditor.storage.markdown.getMarkdown());
     Object.keys(npImageMap).forEach(function(dataUrl) { md = md.split(dataUrl).join(npImageMap[dataUrl]); });
     return md.trim();
   }
@@ -2828,7 +2862,7 @@ setTimeout(function() {
           var raw = decodeURIComponent(escape(atob(data.content.replace(/\n/g, ''))));
           var parsed = parseFrontmatter(raw);
           qeFrontmatter = parsed.frontmatter;
-          qeEditor.commands.setContent(parsed.body || '');
+          qeEditor.commands.setContent(samtbuWrapShortcodes(parsed.body || ''));
 
           // Fyll inn metadata-felter
           document.getElementById('qe-field-title').value    = parseFmField(qeFrontmatter, 'title');
@@ -2919,7 +2953,7 @@ setTimeout(function() {
     saveBtn.textContent = qeLang === 'en' ? 'Saving…' : 'Lagrer…';
     setStatus('');
 
-    var md = qeEditor.storage.markdown.getMarkdown();
+    var md = samtbuUnwrapShortcodes(qeEditor.storage.markdown.getMarkdown());
     Object.keys(qeImageMap).forEach(function(dataUrl) { md = md.split(dataUrl).join(qeImageMap[dataUrl]); });
     var body = md.trim();
 
