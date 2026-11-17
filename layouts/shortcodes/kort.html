@@ -1,0 +1,30 @@
+{{- /*
+  Grafisk kort (solution-samt-bu-docs#95). Står i en {{< kortrad >}}.
+
+  Parametre (alle valgfrie unntatt tittel):
+    tittel  – overskriften på kortet
+    ikon    – navn på et Font Awesome 4.7-ikon, med eller uten «fa-» (f.eks. «flask»)
+    lenke   – adresse kortet peker til; relativ («simpl-open/») eller full. Hele kortet blir klikkbart
+    status  – kort statuslinje nederst på kortet (Markdown)
+    etikett – teksten over statuslinjen; standard «Status» (nb) / «Status» (en)
+  Teksten mellom start- og sluttkoden er Markdown.
+*/ -}}
+{{- $tittel := .Get "tittel" -}}
+{{- if not $tittel -}}{{- errorf "kort: mangler tittel i %s" .Position -}}{{- end -}}
+{{- $lenke := .Get "lenke" -}}
+{{- $ikon := .Get "ikon" | default "" | strings.TrimPrefix "fa-" -}}
+{{- $etikett := .Get "etikett" | default "Status" -}}
+<div class="samtbu-kort{{ if $lenke }} har-lenke{{ end }}">
+  {{- with $ikon }}
+  <div class="samtbu-kort-ikon"><i class="fa fa-{{ . }}" aria-hidden="true"></i></div>
+  {{- end }}
+  <p class="samtbu-kort-tittel">
+    {{- if $lenke }}<a href="{{ $lenke }}">{{ $tittel }}</a>{{ else }}{{ $tittel }}{{ end -}}
+  </p>
+  {{- with .Inner }}
+  <div class="samtbu-kort-tekst">{{ $.Page.RenderString (dict "display" "block") (trim . "\n") }}</div>
+  {{- end }}
+  {{- with .Get "status" }}
+  <div class="samtbu-kort-status"><span class="samtbu-kort-status-etikett">{{ $etikett }}</span>{{ $.Page.RenderString . }}</div>
+  {{- end }}
+</div>

@@ -793,4 +793,80 @@
   .status-chip:hover::after {
     opacity: 1;
   }
+
+  /* Grafiske kort – shortcodene kortrad og kort (solution-samt-bu-docs#95) */
+  .samtbu-kortrad {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin: 1rem 0 1.5rem;
+  }
+  .samtbu-kort {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-top: 4px solid #1b4f8a;
+    border-radius: 6px;
+    padding: 16px 18px 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+  }
+  .samtbu-kort.har-lenke:hover,
+  .samtbu-kort.har-lenke:focus-within {
+    box-shadow: 0 4px 12px rgba(27,79,138,0.18);
+    transform: translateY(-2px);
+  }
+  .samtbu-kort-ikon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #eaf1f9;
+    color: #1b4f8a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    margin-bottom: 10px;
+  }
+  .samtbu-kort-tittel {
+    font-size: 18px;
+    font-weight: bold;
+    margin: 0 0 6px;
+    color: #1b4f8a;
+  }
+  .samtbu-kort-tittel a,
+  .samtbu-kort-tittel a:hover {
+    color: #1b4f8a;
+    border-bottom: none !important;
+    text-decoration: none;
+  }
+  /* Hele kortet er klikkbart, men lenker i teksten virker fortsatt */
+  .samtbu-kort-tittel a::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+  .samtbu-kort-tekst { flex: 1; }
+  .samtbu-kort-tekst p { margin: 0 0 0.5rem; }
+  .samtbu-kort-tekst a { position: relative; z-index: 2; }
+  .samtbu-kort-status {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #f0f0f0;
+    font-size: 13px;
+    font-weight: normal;
+    color: #555;
+  }
+  .samtbu-kort-status p { margin: 0; }
+  .samtbu-kort-status-etikett {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #777;
+    margin-bottom: 2px;
+  }
 </style>

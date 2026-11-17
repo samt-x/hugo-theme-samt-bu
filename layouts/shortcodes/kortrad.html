@@ -1,0 +1,11 @@
+{{- /*
+  Rad med grafiske kort (solution-samt-bu-docs#95). Brukes rundt ett eller flere {{< kort >}}.
+  Kortene står ved siden av hverandre på bred skjerm og under hverandre på smal.
+
+  {{< kortrad >}}
+  {{< kort tittel="…" ikon="flask" lenke="side/" status="…" >}}Tekst i Markdown.{{< /kort >}}
+  {{< /kortrad >}}
+*/ -}}
+<div class="samtbu-kortrad">
+{{ .Inner }}
+</div>
