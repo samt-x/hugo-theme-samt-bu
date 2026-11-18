@@ -1,0 +1,26 @@
+{{- /*
+  «I arbeid»-skilt (veiarbeidsskilt) under en overskrift, for kapitler som ikke er ferdige.
+  Brukes på egen linje rett under overskriften: {{< i-arbeid >}}
+
+  Parametre (valgfrie):
+    tekst – teksten ved skiltet; standard «I arbeid» (nb) / «Work in progress» (en)
+  CSS: .samtbu-i-arbeid i partials/custom-head.html. Brukerveiledningen: «I arbeid-skilt».
+*/ -}}
+{{- $standard := cond (eq .Page.Language.Lang "en") "Work in progress" "I arbeid" -}}
+{{- $tekst := .Get "tekst" | default $standard -}}
+<div class="samtbu-i-arbeid" role="note">
+  <svg class="samtbu-i-arbeid-skilt" viewBox="0 0 100 90" width="34" height="31" aria-hidden="true" focusable="false">
+    <path d="M50 8 L94 83 L6 83 Z" fill="#fff" stroke="#b22222" stroke-width="9" stroke-linejoin="round"/>
+    <g fill="none" stroke="#b22222" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M40 46 L36 60 L30 72"/>
+      <path d="M36 60 L45 70"/>
+      <path d="M40 48 L52 52 L58 46"/>
+      <path d="M44 38 L66 70"/>
+    </g>
+    <circle cx="43" cy="37" r="6" fill="#b22222"/>
+    <path d="M37 35 A6 6 0 0 1 49 35 Z" fill="#b22222"/>
+    <path d="M62 67 L72 63 L74 70 Z" fill="#b22222"/>
+    <path d="M60 76 Q70 66 82 76 Z" fill="#b22222"/>
+  </svg>
+  <span>{{ $tekst }}</span>
+</div>
