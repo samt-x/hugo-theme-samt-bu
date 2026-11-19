@@ -388,6 +388,15 @@ jQuery(document).ready(function () {
             ;
     });
 
+    // Sidetittelen (h1) får samme lenkeikon; lenken er sidens adresse uten anker
+    $("#body-inner > h1").first().append(function () {
+        var url = document.location.origin + document.location.pathname;
+        return " <span class='anchor' data-clipboard-text='" + url + "'>" +
+            "<i class='fa fa-link fa-lg'></i>" +
+            "</span>"
+            ;
+    });
+
     $(".anchor").on('mouseleave', function (e) {
         $(this).attr('aria-label', null).removeClass('tooltipped tooltipped-s tooltipped-w');
     });
