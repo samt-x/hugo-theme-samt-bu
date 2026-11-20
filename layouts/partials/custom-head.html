@@ -229,6 +229,10 @@
   .a-text ul:not(.connected-bullets):not(.no-decoration):not(.a-list) ul ul {
     list-style: square !important;
   }
+  /* Luft under tabeller i innholdet – avsnitt har ingen toppmarg, så teksten under klistret seg til tabellen */
+  #body-inner table {
+    margin-bottom: 18px !important;   /* samme som avstanden mellom avsnitt */
+  }
   /* Ordered lists – fixed-size circles. Bruker position:absolute på ::before (ikke display:flex på li)
      fordi flex-container kollapser trailing space foran <strong>-elementer i Chrome/Blink. */
   .a-text ol {
